@@ -7,6 +7,7 @@ namespace dl::detail::cuda {
 namespace {
 
 constexpr int optimizer_batch_capacity = 32;
+constexpr int optimizer_values_per_thread = 4;
 
 struct SGDSegment {
     using Arithmetic = SGDArithmetic;
@@ -80,10 +81,15 @@ __global__ void optimizer_batch_kernel(const OptimizerBatch<Segment> batch) {
     const auto block = static_cast<int>(blockIdx.x);
     const auto segment = batch.segments[segment_index(batch, block)];
     const typename Segment::Arithmetic update(segment.step);
-    const auto stride = static_cast<Index>(segment.end - segment.begin) * blockDim.x;
-    for (Index index = static_cast<Index>(block - segment.begin) * blockDim.x + threadIdx.x;
-         index < segment.count; index += stride) {
-        segment.apply(update, index);
+    const auto stride = static_cast<Index>(segment.end - segment.begin) * blockDim.x * optimizer_values_per_thread;
+    for (Index base = static_cast<Index>(block - segment.begin) * blockDim.x * optimizer_values_per_thread + threadIdx.x;
+         base < segment.count; base += stride) {
+        // 每线程更新四个相隔 blockDim.x 的元素，各轮 warp 读写仍连续，描述和系数可以复用。
+        #pragma unroll
+        for (int item = 0; item < optimizer_values_per_thread; ++item) {
+            const auto index = base + item * blockDim.x;
+            if (index < segment.count) segment.apply(update, index);
+        }
     }
 }
 
@@ -107,7 +113,7 @@ void submit_optimizer_updates(std::span<const Update> updates, Dense dense, Desc
             continue;
         }
         // 表随 kernel 参数传入，设备侧直接读取各张量和选项，无需单独的元信息缓冲。
-        const int end = batch.blocks + grid_size(count);
+        const int end = batch.blocks + grid_size((count + optimizer_values_per_thread - 1) / optimizer_values_per_thread);
         batch.segments[batch.count++] = describe(update, count, batch.blocks, end);
         batch.blocks = end;
         if (batch.count == optimizer_batch_capacity) launch();

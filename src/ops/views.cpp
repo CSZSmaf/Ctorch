@@ -7,13 +7,13 @@
 
 namespace dl::detail::numeric {
 
-TensorData reshape(const TensorData& input, Shape shape) {
+TensorData reshape(TensorData input, Shape shape) {
     shape = resolve_shape(std::move(shape), input.layout.numel());
     auto strides = reshape_strides(input.layout, shape);
-    auto result = strides ? input : clone(input);
+    if (!strides) input = clone(input);
     auto steps = strides ? std::move(*strides) : contiguous_strides(shape);
-    result.layout = {std::move(shape), std::move(steps), result.layout.offset};
-    return result;
+    input.layout = {std::move(shape), std::move(steps), input.layout.offset};
+    return input;
 }
 
 TensorData transpose(const TensorData& input, Index first, Index second) {
@@ -61,8 +61,8 @@ namespace {
 
 Tensor shape_result(detail::TensorData result, const Tensor& input) {
     return detail::record(std::move(result), {detail::gradient_edge(input)},
-        [shape = input.shape()](const auto& grad, auto& sink, const auto& edges) {
-            sink.add(edges[0], detail::numeric::reshape(grad, shape));
+        [shape = input.shape()](auto grad, auto& sink, const auto& edges) {
+            sink.add_transferred(edges[0], detail::numeric::reshape(std::move(grad), shape));
         });
 }
 
@@ -85,8 +85,8 @@ Tensor flatten(const Tensor& input, Index first, Index last) {
 
 Tensor Tensor::clone() const {
     return detail::record(detail::numeric::clone(detail::data_of(*this)),
-        {detail::gradient_edge(*this)}, [](const auto& grad, auto& sink, const auto& edges) {
-            sink.add(edges[0], grad);
+        {detail::gradient_edge(*this)}, [](auto grad, auto& sink, const auto& edges) {
+            sink.add_transferred(edges[0], std::move(grad));
         });
 }
 
@@ -112,8 +112,9 @@ Tensor Tensor::astype(DType dtype) const {
         return detail::make_tensor(std::move(result));
     }
     return detail::record(std::move(result), {detail::gradient_edge(*this)},
-        [source_type = this->dtype()](const auto& grad, auto& sink, const auto& edges) {
-            sink.add(edges[0], detail::numeric::cast(grad, accumulation_dtype(source_type)));
+        [source_type = this->dtype()](auto grad, auto& sink, const auto& edges) {
+            grad = detail::numeric::cast(grad, accumulation_dtype(source_type));
+            sink.add_transferred(edges[0], std::move(grad));
         });
 }
 

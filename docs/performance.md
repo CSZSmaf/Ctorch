@@ -48,6 +48,22 @@ dl::cuda::release_unused_memory();
 
 需要限制缓存保留量时，可以调用 `dl::cuda::set_memory_release_threshold(bytes)`。设为零后，Runtime 会在同步点尝试回收空闲空间。阈值控制缓存保留策略，不是整个程序的显存容量上限。完整示例见 [cuda_memory.cpp](../examples/cuda_memory.cpp)。
 
+### 转交反向传播中的梯度缓冲
+
+`reshape`、`flatten`、`squeeze` 和 `unsqueeze` 的反向传播只需恢复原输入形状，梯度的元素值不变。`clone` 的反向也直接传递梯度。如果每经过一个这样的节点都复制梯度，就会增加临时显存和设备复制操作。
+
+Ctorch 在这些节点之间转交独立且连续的梯度缓冲。C++ 的移动操作转交存储句柄，显存中的元素保持在原位置。首次贡献直接成为目标梯度，已有贡献则继续原地累计。类型转换生成的独立结果和默认标量种子也使用同一套转交方式。
+
+通过 `dl::grad` 请求的中间梯度需要保留其值。存储仍由其他结果持有时，累计目标使用独立副本。调用方传入的反向种子也保持独立。这样，求中间梯度、分支汇合和多次梯度累加仍使用原来的接口和数值规则。
+
+### 批量更新参数
+
+CUDA 后端将最多 32 个连续参数的更新描述放入同一份内核参数表。一个参数保留自己的学习率、权重衰减和状态，多个参数可以在同一次提交中更新。SGD、Adam、AdamW、RMSprop 和 Adagrad 共用这套遍历方式。
+
+批量内核中，每个线程一次处理四个元素，并复用参数描述和更新系数。各轮中相邻线程访问相邻元素，循环次数在编译期展开。每个元素继续使用原来的动量、矩估计和参数更新公式。张量末尾按实际元素数处理，带步长的参数使用对应的布局内核。
+
+线程内处理多个元素的方式可参考 [NVIDIA 的执行配置说明](https://docs.nvidia.com/cuda/cuda-c-best-practices-guide/index.html#execution-configuration-optimizations)和 [PyTorch 的多张量更新实现](https://github.com/pytorch/pytorch/blob/main/aten/src/ATen/native/cuda/MultiTensorApply.cuh)。
+
 ### 测量完整训练步
 
 单个算子变快后，完整训练的收益还取决于它原本占用多少时间。矩阵乘、卷积、数据传输和优化器更新仍然需要执行。测量时将输入提前放到 GPU，先预热，再对包含清空梯度、前向、反向和参数更新的整个训练步计时。

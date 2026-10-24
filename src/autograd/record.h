@@ -19,8 +19,8 @@ public:
         : Node(std::move(inputs)), function_(std::move(function)) {}
 
     void backward(TensorData grad, GradSink& sink) override {
-        // 中间梯度也可被 grad 的结果列表持有，VJP 通过只读借用计算各输入贡献。
-        (*function_)(grad, sink, inputs);
+        // 普通 VJP 只读借用；传递节点可接收所有权，并由 GradSink 处理结果捕获造成的共享。
+        (*function_)(std::move(grad), sink, inputs);
     }
     void release_saved() override { function_.reset(); }
 

@@ -97,6 +97,11 @@ void GradSink::add_owned(const Edge& edge, TensorData contribution) {
     accumulate(edge, std::move(contribution), true);
 }
 
+void GradSink::add_transferred(const Edge& edge, TensorData contribution) {
+    const bool owns_storage = contribution.storage.use_count() == 1 && contribution.layout.is_contiguous();
+    accumulate(edge, std::move(contribution), owns_storage);
+}
+
 void GradSink::add_reduced(const Edge& edge, const TensorData& contribution, const Shape& shape) {
     if (!needs(edge)) return;
     auto output = target(edge, shape, contribution.dtype, contribution.device());
@@ -139,10 +144,10 @@ std::unique_ptr<AutogradMeta> make_leaf_meta() {
     return std::make_unique<AutogradMeta>(AutogradMeta{{std::move(node)}, std::move(slot)});
 }
 
-void run_backward(const Edge& root, const TensorData& seed) {
+void run_backward(const Edge& root, TensorData seed) {
     auto order = topological_order(std::span<const Edge>(&root, 1));
     GradSink sink;
-    sink.add(root, seed);
+    sink.add_transferred(root, std::move(seed));
     execute_backward(order, sink);
 }
 

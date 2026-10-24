@@ -44,6 +44,8 @@ public:
     void add(const Edge& edge, const TensorData& contribution);
     /// 交接独立、连续、可写的计算结果；调用方随后不再读写其存储。
     void add_owned(const Edge& edge, TensorData contribution);
+    /// 转交已消费的中间梯度；独占且连续的存储直接接入目标，共享结果保留独立副本。
+    void add_transferred(const Edge& edge, TensorData contribution);
     /// 借用广播后的贡献，按原输入形状直接归约到累计目标。
     void add_reduced(const Edge& edge, const TensorData& contribution, const Shape& shape);
     /// 为已选中的边取得连续目标；初值仅用于新目标，已有贡献始终保留。
@@ -76,7 +78,7 @@ struct AutogradMeta {
 using SavedTensor = TensorData;
 
 std::unique_ptr<AutogradMeta> make_leaf_meta();
-void run_backward(const Edge& root, const TensorData& seed);
+void run_backward(const Edge& root, TensorData seed);
 std::vector<std::optional<TensorData>> run_grad(std::span<const Edge> roots,
     std::span<const Edge> inputs, std::span<const TensorData> seeds);
 

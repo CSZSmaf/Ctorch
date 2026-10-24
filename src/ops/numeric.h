@@ -109,7 +109,7 @@ TensorData where(const TensorData& mask, const TensorData& a, const TensorData& 
 TensorData compare(const TensorData& a, const TensorData& b, Compare operation);
 TensorData concat(std::span<const TensorData> inputs, Index axis);
 
-TensorData reshape(const TensorData& input, Shape shape);
+TensorData reshape(TensorData input, Shape shape);
 TensorData transpose(const TensorData& input, Index first, Index second);
 TensorData permute(const TensorData& input, const Shape& axes);
 TensorData expand(const TensorData& input, Shape shape);

@@ -32,15 +32,15 @@ byId("scrim").onclick = () => setMenu(false);
 
 function updateProgress() {
   const count = lessons.filter(lesson => completed.has(lesson.id)).length;
+  byId("progress").max = lessons.length;
   byId("progress").value = count;
   byId("progress-text").textContent = `${count} / ${lessons.length}`;
   courseLinks.forEach(link => {
     link.querySelector(".done-mark").textContent = completed.has(link.hash.slice(1)) ? "✓" : "";
   });
   const done = completed.has(currentLesson.id);
-  byId("complete").textContent = done ? "✓ 本节已完成" : "标记本节已完成";
+  byId("complete").textContent = done ? "✓ 已读" : "标记为已读";
   byId("complete").setAttribute("aria-pressed", String(done));
-  byId("completion-note").textContent = done ? "可以继续下一节，也可以随时回来复习。" : "按自己的节奏继续。";
 }
 
 // 正文直接存在于 HTML 中；路由只选择当前课程，并从其标题生成页内目录。
@@ -126,7 +126,7 @@ function search() {
   if (matches.length === 0) {
     const empty = document.createElement("p");
     empty.className = "search-empty";
-    empty.textContent = "没有匹配的课程。可以换一个关键词，例如“梯度”或“状态”。";
+    empty.textContent = "没有找到相关内容。";
     byId("search-results").append(empty);
   }
 }

@@ -1,6 +1,6 @@
 # 两种构建入口共用公开接口示例；真实数据训练入口由源码工程单独加入。
 set(CTORCH_CPP_EXAMPLES
-    first_training parameter_layer custom_layer custom_vjp activation_checkpoint gradients execution_plan multi_output_plan
+    first_training training_basics parameter_layer custom_layer custom_vjp activation_checkpoint gradients execution_plan multi_output_plan
     functional_state random_key functional_optimizer functional_module finetune)
 set(CTORCH_C_EXAMPLES
     c_train c_custom_vjp c_activation_checkpoint c_execution_plan c_gradients

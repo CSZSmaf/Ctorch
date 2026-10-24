@@ -61,6 +61,22 @@ void reduce_into(TensorData& result, const TensorData& input, const Shape& axes,
         (reduced ? reduced_strides : outer_strides).push_back(input.layout.strides[axis]);
     }
     const auto count = numel(reduced_shape);
+    // 前导维归约可视为连续矩阵的列归约，也覆盖 Linear 偏置和广播梯度的求和。
+    const bool leading = !axes.empty() && axes.back() == static_cast<Index>(axes.size()) - 1;
+    const auto parts = std::max(Index{1}, (count + column_tile_rows - 1) / column_tile_rows);
+    // 多分区路径需要足够的并行任务，以抵消合并结果时额外启动的开销。
+    if (leading && groups >= warp_size && input.layout.is_contiguous()
+        && (parts == 1 || parts * groups >= block_size * warp_size)) {
+        TensorData partial = parts == 1 ? result : empty_data({parts, groups}, input.dtype, input.device());
+        {
+            Execution execution(input);
+            reduce_columns_kernel<Maximum><<<grid_size(parts * groups), block_size, 0, execution.stream()>>>(
+                input.data<float>(), partial.mutable_data<float>(), count, groups, parts, parts == 1 && accumulate);
+            check(cudaGetLastError());
+        }
+        if (parts != 1) reduce_into<Maximum>(result, partial, {0}, accumulate);
+        return;
+    }
     const auto tiles = std::max(Index{1}, (count + reduction_tile - 1) / reduction_tile);
     TensorData partial = tiles == 1 ? result : empty_data({groups, tiles}, input.dtype, input.device());
     // 长归约分块生成局部结果，再按相同计算规则合并，使小输出也能使用多个 block。

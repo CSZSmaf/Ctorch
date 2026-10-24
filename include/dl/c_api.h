@@ -472,7 +472,7 @@ DL_API dl_status dl_synchronize(dl_device device);
 /* 查询与峰值重置不等待 stream；需要阶段统计时先 dl_synchronize。
  * CUDA 构建按设备惰性创建池，CPU-only 构建通过 DL_ERROR 交付功能不可用。 */
 DL_API dl_status dl_cuda_memory_get_stats(int32_t device, dl_cuda_memory_stats* output);
-/* 阈值在同步点影响空闲内存归还，默认零，不表示显存容量上限。 */
+/* 默认保留空闲显存供后续分配复用；阈值设为零时在同步点尝试归还，不表示容量上限。 */
 DL_API dl_status dl_cuda_memory_set_release_threshold(int32_t device, uint64_t bytes);
 DL_API dl_status dl_cuda_memory_reset_peak_stats(int32_t device);
 /* 在训练阶段之间归还工作区、等待两个框架 stream 并尝试清空池内空闲空间。

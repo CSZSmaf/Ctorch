@@ -7,6 +7,31 @@ namespace dl::detail::cuda {
 namespace {
 
 constexpr Index reduction_tile = 4096;
+constexpr Index column_tile_rows = 64;
+
+/// 连续矩阵跨行归约时，相邻线程负责相邻列；分区内的读取沿行合并。
+template <bool Maximum>
+__global__ void reduce_columns_kernel(const float* input, float* output, Index rows,
+                                     Index columns, Index parts, bool accumulate) {
+    for (Index task = static_cast<Index>(blockIdx.x) * blockDim.x + threadIdx.x;
+         task < parts * columns; task += static_cast<Index>(gridDim.x) * blockDim.x) {
+        const auto column = task % columns;
+        const auto begin = (task / columns) * column_tile_rows;
+        const auto end = rows < begin + column_tile_rows ? rows : begin + column_tile_rows;
+        const float identity = Maximum ? -CUDART_INF_F : 0.0f;
+        // 独立累加器缩短指令依赖和连续舍入链，固定下标由编译器展开到寄存器。
+        float values[4]{identity, identity, identity, identity};
+        for (Index row = begin; row < end; row += 4) {
+            #pragma unroll
+            for (int item = 0; item < 4; ++item)
+                if (row + item < end)
+                    values[item] = reduce_pair<Maximum>(values[item], input[(row + item) * columns + column]);
+        }
+        const float value = reduce_pair<Maximum>(reduce_pair<Maximum>(values[0], values[1]),
+                                                reduce_pair<Maximum>(values[2], values[3]));
+        output[task] = accumulate ? reduce_pair<Maximum>(output[task], value) : value;
+    }
+}
 
 /// 每个 block 产生一个分块结果，tiles 决定同一逻辑输出使用的分块数量。
 template <bool Maximum>

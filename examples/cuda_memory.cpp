@@ -13,7 +13,7 @@ void print_memory(const char* phase, int device) {
 int main(int argc, char** argv) {
     const int index = argc > 1 ? std::stoi(argv[1]) : 0;
     const auto device = dl::Device::cuda(index);
-    // 重复训练可保留一部分池内空间；阶段结束后显式归还空闲资源。
+    // 将默认保留策略改为 64 MiB 阈值，阶段结束后显式归还空闲资源。
     dl::cuda::set_memory_release_threshold(64ULL * 1024 * 1024, index);
     {
         const auto input = dl::ones({2, 3, 8, 8}, {.device = device});

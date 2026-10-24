@@ -16,7 +16,8 @@ struct MemoryStats {
 /// 各属性直接从 Runtime 读取，不等待 stream；阶段边界可先 synchronize 再读取。
 /// 首次调用建立指定设备的上下文，CPU-only 构建通过异常交付功能不可用。
 DL_API MemoryStats memory_stats(int device = 0);
-/// 同步点尝试释放超过阈值的池内空闲内存；默认零，阈值不是显存容量上限。
+/// 默认保留空闲显存供后续分配复用；设为零后，同步点尝试归还全部空闲空间。
+/// 阈值控制缓存保留量，不表示显存容量上限。
 DL_API void set_memory_release_threshold(std::uint64_t bytes, int device = 0);
 /// 重置 Runtime 的两个峰值属性，当前分配与保留空间继续由池持有。
 DL_API void reset_peak_memory_stats(int device = 0);

@@ -34,6 +34,6 @@
 
 ## CUDA 内存
 
-CUDA 上下文管理计算 stream、复制 stream 和专用 Runtime 内存池。分配、事件依赖与异步归还沿 stream 排序；cuDNN 工作区按需求复用。公开统计描述本框架内存池，不包含设备库的私有分配。
+CUDA 上下文管理计算 stream、复制 stream 和专用 Runtime 内存池。分配、事件依赖与异步归还沿 stream 排序；cuDNN 工作区按需求复用。空闲显存默认跨同步点保留，后续训练步可以继续使用。公开统计描述本框架内存池，不包含设备库的私有分配。
 
 阶段结束时可查询池内使用量、设置保留阈值或回收空闲存储，见 [cuda_memory.cpp](../examples/cuda_memory.cpp)。

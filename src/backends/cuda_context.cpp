@@ -5,6 +5,7 @@
 #endif
 
 #include <algorithm>
+#include <limits>
 #include <map>
 #include <mutex>
 #include <stdexcept>
@@ -39,7 +40,11 @@ MemoryPool create_memory_pool(Device device) {
     properties.location = {cudaMemLocationTypeDevice, device.index};
     cudaMemPool_t pool;
     check(cudaMemPoolCreate(&pool, &properties));
-    return MemoryPool(pool, MemoryPoolDeleter{device.index});
+    MemoryPool result(pool, MemoryPoolDeleter{device.index});
+    // 空闲页跨同步点保留，后续训练步继续从同一内存池分配。
+    auto retention = std::numeric_limits<std::uint64_t>::max();
+    check(cudaMemPoolSetAttribute(pool, cudaMemPoolAttrReleaseThreshold, &retention));
+    return result;
 }
 void release_allocation(void* address, void* owner) noexcept {
     auto& context = *static_cast<Context*>(owner);

@@ -10,6 +10,7 @@
 namespace dl::detail::cuda {
 
 constexpr int block_size = 256;
+constexpr int warp_size = 32;
 constexpr int max_rank = 16;
 
 inline int grid_size(Index count) {

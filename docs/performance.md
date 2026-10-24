@@ -1,8 +1,52 @@
 # 性能与内存
 
-模型的耗时包括矩阵计算、张量寻址、数据复制和内存分配。Ctorch 的 CPU 内核使用类型化循环和 BLAS。训练代码还可以通过 `MemoryGuard` 复用中间张量的存储。
+模型的耗时包括矩阵计算、张量寻址、数据复制和内存分配。CUDA 后端使用 cuBLAS、cuDNN 和通用 CUDA 内核，CPU 后端使用类型化循环和 BLAS。
 
-## 在训练循环中复用内存
+## CUDA 计算与显存复用
+
+### 让相邻线程读取相邻元素
+
+对形状为 `[rows, columns]` 的连续矩阵，`sum(input, {0})` 沿行求和，得到每一列的总和。如果一组线程只计算一列，相邻线程读取的地址会间隔 `columns` 个元素。列数较多时，一次显存访问中实际用到的数据比例较低。
+
+Ctorch 让相邻线程分别负责相邻列，每个线程先累计 64 行，再用相同的算法合并各分区的结果。这样每轮读取都沿一行连续进行。每个输出位置只有一个线程写入，无需原子加法。`amax` 使用相同的遍历方式。需要分区但并行任务较少时，仍使用原有归约路径，减少内核启动。
+
+连续张量的前导维归约都可以使用这条路径。例如，`[batch, length, width]` 沿前两维求和时，可以视为 `[batch * length, width]` 的矩阵。Linear 偏置梯度和广播梯度中的对应求和也会使用它。转置、切片和其他归约轴继续按张量步长访问。
+
+分区大小是编译期常量，求和与最大值通过模板选择，内层循环只执行所需运算。每个线程用四个独立累加器处理不同的行，最后两两合并，减少连续依赖和连续舍入。分区会改变浮点加法的顺序，结果可能有少量舍入差异。
+
+在 NVIDIA GeForce RTX 5090 Laptop GPU 上，对连续的 `4096 × 1024` FP32 张量测得以下 CUDA event 耗时。两个版本都启用相同的缓冲复用。每个算子预热至少 200 ms，再测量 7 组，每组执行 20 次；表中取三轮独立测量的中位数。
+
+| 运算 | 原实现 / μs | 当前实现 / μs | 加速比 |
+| --- | ---: | ---: | ---: |
+| 跨行求和 `sum(input, {0})` | 82.04 | 18.48 | 4.44× |
+| 跨行最大值 `amax(input, {0})` | 81.43 | 19.38 | 4.20× |
+
+### 在训练步之间保留空闲显存
+
+CUDA 张量默认使用专用的异步内存池。张量释放后，空闲空间留在池中供后续分配复用。读取损失或等待 GPU 完成时，内存池也继续保留这些空间。普通 CUDA 训练无需额外添加内存作用域。
+
+`dl::cuda::memory_stats()` 的 `used_bytes` 表示仍在使用的分配，`reserved_bytes` 还包含池内的空闲空间。一个训练阶段结束后，可以调用 `dl::cuda::release_unused_memory()` 归还空闲空间。仍被张量持有的存储继续有效。
+
+```cpp
+dl::synchronize(dl::Device::cuda());
+const auto stats = dl::cuda::memory_stats();
+std::cout << stats.used_bytes << ' ' << stats.reserved_bytes << '\n';
+dl::cuda::release_unused_memory();
+```
+
+需要限制缓存保留量时，可以调用 `dl::cuda::set_memory_release_threshold(bytes)`。设为零后，Runtime 会在同步点尝试回收空闲空间。阈值控制缓存保留策略，不是整个程序的显存容量上限。完整示例见 [cuda_memory.cpp](../examples/cuda_memory.cpp)。
+
+### 测量完整训练步
+
+单个算子变快后，完整训练的收益还取决于它原本占用多少时间。矩阵乘、卷积、数据传输和优化器更新仍然需要执行。测量时将输入提前放到 GPU，先预热，再对包含清空梯度、前向、反向和参数更新的整个训练步计时。
+
+CUDA 算子异步提交。宿主计时需要在测量边界等待 GPU 完成；CUDA event 则应记录在执行计算的 stream 上。调用 `loss.item<float>()` 会把标量传回 CPU，适合按日志间隔使用。
+
+MLP、卷积网络和单层编码器的完整 CUDA 训练步耗时见[框架结果对比](projects/comparison.md#cuda-训练步耗时)。
+
+内存池的行为见 [CUDA 异步内存分配说明](https://docs.nvidia.com/cuda/cuda-programming-guide/04-special-topics/stream-ordered-memory-allocation.html)。
+
+## 在 CPU 训练循环中复用内存
 
 在循环外创建一个 `dl::MemoryGuard`。作用域内的普通张量分配会使用同一个缓冲池，前向、反向和优化器更新都可以复用空闲块。
 

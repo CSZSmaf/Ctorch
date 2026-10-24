@@ -6,6 +6,7 @@
   <meta name="color-scheme" content="light dark">
   <meta name="description" content="Ctorch C++ 教程：张量、自动求导、数据加载、模型训练、保存恢复、设备和扩展。">
   <title>Ctorch 教程</title>
+  <link rel="canonical" href="https://ctorch.one-forth.com/">
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="style.css">
   <script src="tutorial.js" defer></script>
@@ -15,7 +16,7 @@
   <header class="site-header">
     <button class="icon-button menu-button" id="menu" aria-label="打开课程目录" aria-controls="sidebar" aria-expanded="false">☰</button>
     <a class="brand" href="#quickstart" aria-label="Ctorch 教程首页"><span class="brand-mark" aria-hidden="true">C<span>·</span></span>Ctorch<span class="brand-section"> / 教程</span></a>
-    <nav class="top-links" aria-label="文档导航"><a class="current" href="#quickstart">教程</a><a href="../architecture.md">架构</a><a href="../../examples/README.md">示例</a></nav>
+    <nav class="top-links" aria-label="文档导航"><a href="https://one-forth.com">One Forth</a><a href="../architecture.md">架构</a><a href="../../examples/README.md">示例</a></nav>
     <div class="header-actions">
       <button id="search-open" class="search-trigger" aria-label="搜索教程"><span aria-hidden="true">⌕</span> <span class="search-label">搜索文档</span><kbd>Ctrl K</kbd></button>
       <button class="icon-button" id="theme" aria-label="切换深色主题" title="切换主题">◐</button>
@@ -68,6 +69,7 @@
           <div class="workflow-detail" aria-live="polite"><code id="workflow-code">auto input = dl::from_span&lt;float&gt;(x, {5, 1});</code><p id="workflow-text">把五个样本放入一个批次。shape 的第一维是样本数，第二维是每个样本的特征数。</p></div>
         </div>
         <h2 id="quickstart-build">构建并运行</h2>
+        <p>从 <a href="https://github.com/CSZSmaf/Ctorch">GitHub 仓库</a>取得代码，或在<a href="https://github.com/CSZSmaf/Ctorch/releases/latest">版本下载</a>中下载源码包。离线教程包解压后打开根目录的 index.html 即可阅读。</p>
         <p>在仓库根目录执行。需要 CMake 3.24+、Ninja 和支持 C++20 的编译器；Windows 可使用已配置的 MSVC 开发终端。</p>
         <pre data-language="Shell"><code>cmake --preset cpu -DCTORCH_BUILD_EXAMPLES=ON
 cmake --build --preset cpu --target ctorch_first_training</code></pre>
@@ -447,7 +449,7 @@ Metrics evaluate(dl::nn::Sequential&amp; model, dl::data::DataLoader&amp; loader
         <p>显存不足时，把一次更新所需的批次拆成多个微批。假设整批有 N 个有效样本，每个微批有 n 个，平均损失乘以 n/N 后再反向。整个更新窗口只清空一次梯度并执行一次 <code>step()</code>。忽略标签和变长序列按有效目标数加权。</p>
         <p>裁剪在所有微批反向结束后进行。<code>dl::optim::clip_grad_norm(model.parameters(), 1.0)</code> 把总梯度范数限制为 1。AMP 的梯度还原顺序见<a href="#precision-clip">梯度还原与裁剪</a>。</p>
         <h2 id="training-complete">完整分类程序</h2>
-        <p><a href="../../examples/training_basics.cpp" download>下载 training_basics.cpp</a>。程序生成 64 个训练样本和 25 个不同位置的验证样本，完成批次训练、评估、学习率调度和保存恢复，不需要下载数据。</p>
+        <p>完整程序见 <a href="../../examples/training_basics.cpp">training_basics.cpp</a>。程序生成 64 个训练样本和 25 个不同位置的验证样本，完成批次训练、评估、学习率调度和保存恢复，不需要下载数据。</p>
         <pre data-language="Shell"><code>cmake --build --preset cpu --target ctorch_training_basics
 ../Ctorch-build/cpu/bin/ctorch_training_basics ../Ctorch-build/training-basics.ct</code></pre>
         <p>Windows 运行命令为 <code>..\Ctorch-build\cpu\bin\ctorch_training_basics.exe ..\Ctorch-build\training-basics.ct</code>。程序输出每五轮的验证指标以及恢复后的指标。恢复前后的指标应一致；这个简单数据集只用于学习训练流程。</p>
@@ -787,7 +789,7 @@ auto output = request.output();</code></pre>
 
       <div class="lesson-completion"><button id="complete" class="button" aria-pressed="false">标记为已读</button></div>
       <nav class="lesson-pagination" aria-label="前后课程"><a id="previous" href="#quickstart"><small>上一节</small><strong>快速开始</strong></a><a id="next" href="#tensors"><small>下一节 <span>→</span></small><strong>张量与存储</strong></a></nav>
-      <footer class="article-footer"><a href="#reference">API 与示例索引</a><button id="print" class="text-button">打印本节</button></footer>
+      <footer class="article-footer"><a href="https://one-forth.com">One Forth</a><a href="https://github.com/CSZSmaf/Ctorch">GitHub</a><a href="https://github.com/CSZSmaf/Ctorch/releases/latest">版本下载</a><button id="print" class="text-button">打印本节</button></footer>
     </main>
     <aside class="toc" aria-label="本页目录"><div class="toc-title">本页内容</div><nav id="page-toc"></nav><a class="toc-source" href="https://github.com/CSZSmaf/Ctorch/tree/main/docs/tutorial">查看教程源文件 ↗</a></aside>
   </div>

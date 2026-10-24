@@ -1,6 +1,8 @@
 # Ctorch 教程
 
-下载仓库后，在浏览器打开 [index.html](index.html)。网页可离线使用，无需安装前端依赖。GitHub 文件预览展示 HTML 源码。
+访问[在线教程](https://ctorch.one-forth.com)，或从 [Release](https://github.com/CSZSmaf/Ctorch/releases/latest) 下载离线教程包。离线包解压后打开根目录的 `index.html`。下载整个仓库时，打开 `docs/tutorial/index.html`。网页可离线使用，无需安装前端依赖。
+
+[One Forth](https://one-forth.com) · [GitHub 仓库](https://github.com/CSZSmaf/Ctorch)
 
 基础课程按“快速开始 → 张量 → 数据与预处理 → 模型 → 自动求导 → 训练与评估 → 保存恢复”的顺序组织。后续课程介绍自定义模块、设备与混合精度、函数式状态与执行计划、扩展接口。最后一节提供 API、示例和常见问题索引。
 
@@ -11,3 +13,7 @@
 左侧目录切换章节，右侧目录定位正文。`Ctrl K` 或 `⌘ K` 搜索正文和代码。页面支持代码复制、主题切换、已读标记和打印。
 
 课程顺序参考 [PyTorch Learn the Basics](https://docs.pytorch.org/tutorials/beginner/basics/intro.html)。数据预处理、分类输出和预测步骤参考 [TensorFlow 分类教程](https://www.tensorflow.org/tutorials/keras/classification)，训练与评估的组织参考 [TensorFlow 自定义训练循环](https://www.tensorflow.org/tutorials/quickstart/advanced)。代码使用 Ctorch 自身的 C++ 接口。
+
+## 生成网站文件
+
+`node docs/tutorial/build.mjs ../Ctorch-site` 将网页写入指定目录。在线页面的手册和源码链接指向 GitHub，仓库中的相对链接继续用于离线阅读。

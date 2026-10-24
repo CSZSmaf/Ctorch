@@ -11,23 +11,42 @@ const katex = require("katex");
 const { Marked } = await import(pathToFileURL(require.resolve("marked")));
 const template = await readFile(join(source, "reader.html"), "utf8");
 const pages = new Map();
-const navigation = [
-  ["docs/projects/README.md", "项目教程"],
-  ["docs/projects/mnist.md", "MNIST：MLP 与 LeNet"],
-  ["docs/projects/resnet.md", "CIFAR-10：ResNet-20"],
-  ["docs/projects/transformer.md", "Shakespeare：Transformer"],
-  ["docs/projects/comparison.md", "框架结果对比"],
-  ["docs/README.md", "手册目录"],
-  ["docs/build.md", "构建与安装"],
-  ["docs/tensors.md", "张量与梯度"],
-  ["docs/training.md", "模型与训练"],
-  ["docs/execution.md", "组合与执行"],
-  ["docs/extensions.md", "C17 与外部计算"],
-  ["docs/npu.md", "OpenVINO / Intel NPU"],
-  ["docs/architecture.md", "架构"],
-  ["examples/README.md", "示例程序"],
-  ["tests/README.md", "测试说明"],
-];
+const sections = {
+  tutorial: { title: "教程", pages: [
+    ["docs/tutorial/index.html", "课程目录"],
+    ["docs/tutorial/README.md", "教程使用"],
+  ] },
+  projects: { title: "项目", pages: [
+    ["docs/projects/README.md", "项目目录"],
+    ["docs/projects/mnist.md", "MNIST：MLP 与 LeNet"],
+    ["docs/projects/resnet.md", "CIFAR-10：ResNet-20"],
+    ["docs/projects/transformer.md", "Shakespeare：Transformer"],
+    ["docs/projects/comparison.md", "框架结果对比"],
+  ] },
+  manual: { title: "手册", pages: [
+    ["docs/README.md", "手册目录"],
+    ["docs/build.md", "构建与安装"],
+    ["docs/tensors.md", "张量与梯度"],
+    ["docs/training.md", "模型与训练"],
+    ["docs/execution.md", "组合与执行"],
+    ["docs/extensions.md", "C17 与外部计算"],
+    ["docs/npu.md", "OpenVINO / Intel NPU"],
+    ["docs/architecture.md", "架构"],
+    ["tests/README.md", "测试说明"],
+  ] },
+  examples: { title: "示例", pages: [
+    ["examples/README.md", "示例目录"],
+    ["examples/first_training.cpp", "第一次训练"],
+    ["examples/training_basics.cpp", "批次、评估与恢复"],
+    ["examples/parameter_layer.cpp", "自定义参数层"],
+    ["examples/mnist_mlp.cpp", "MNIST MLP"],
+    ["examples/mnist_lenet.cpp", "MNIST LeNet"],
+    ["examples/cifar_resnet.cpp", "CIFAR-10 ResNet"],
+    ["examples/shakespeare_transformer.cpp", "Shakespeare Transformer"],
+    ["examples/text_generate.cpp", "文本生成"],
+    ["examples/comparison/README.md", "跨框架比较"],
+  ] },
+};
 const namedRoutes = new Map([
   ["docs/tutorial/index.html", "index.html"],
   ["README.md", "manual/overview.html"],
@@ -70,8 +89,17 @@ function math(html) {
 }
 function reader(file, page, title, body, headings = []) {
   const prefix = relative(page, "index.html").replace(/index\.html$/, "");
+  const section = file.startsWith("docs/projects/") ? sections.projects
+    : file.startsWith("examples/") ? sections.examples
+    : file.startsWith("docs/tutorial/") ? sections.tutorial : sections.manual;
+  const navigation = section.pages.some(([target]) => target === file)
+    ? section.pages : [...section.pages, [file, title]];
   const values = {
     TITLE: escape(title), PAGE: page, ROOT: prefix, CONTENT: math(body),
+    SECTION: section.title,
+    SECTION_HOME: relative(page, route(section.pages[0][0])),
+    TOP_NAVIGATION: Object.values(sections).map(item =>
+      `<a href="${relative(page, route(item.pages[0][0]))}"${item === section ? ' class="current" aria-current="true"' : ""}>${item.title}</a>`).join(""),
     NAVIGATION: navigation.map(([target, label]) =>
       `<a href="${relative(page, route(target))}"${target === file ? ' aria-current="page"' : ""}>${label}</a>`).join("\n"),
     TOC: headings.map(({ id, title, depth }) =>
@@ -98,7 +126,8 @@ const html = (await readFile(join(root, main), "utf8"))
   .replace('<link rel="stylesheet" href="style.css">',
     '<link rel="stylesheet" href="assets/katex/katex.min.css">\n  <link rel="stylesheet" href="style.css">');
 await save("index.html", math(html));
-for (const [file] of navigation) route(file);
+for (const section of Object.values(sections))
+  for (const [file] of section.pages) route(file);
 
 // 每份 Markdown 生成正文和标题目录，源文件页另附可下载的原文件。
 for (const [file, page] of pages) {

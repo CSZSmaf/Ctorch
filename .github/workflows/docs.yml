@@ -1,0 +1,16 @@
+name: Documentation
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Install documentation tools
+        run: npm install --prefix ../Ctorch-docs-tools --save-exact katex@0.19.1 marked@18.1.1
+      - name: Build documentation
+        run: node docs/tutorial/build.mjs ../Ctorch-site ../Ctorch-docs-tools

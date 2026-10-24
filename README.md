@@ -2,11 +2,11 @@
 
 Ctorch 是面向 CPU 与单卡 CUDA 的轻量深度学习框架，以 C++20 和 C17 实现。模型使用普通 C++ 函数组织，张量、一阶自动求导、模块和优化器共享同一套计算语义。
 
-从[在线教程](https://ctorch.one-forth.com)开始：在浏览器中观察张量布局、梯度与训练过程，再运行对应的 C++ 示例。下载仓库后，直接打开 `docs/tutorial/index.html` 即可离线阅读。
+从[在线教程](https://ctorch.one-forth.com)开始：在浏览器中观察张量布局、梯度与训练过程，再运行对应的 C++ 示例。[离线教程包](https://ctorch.one-forth.com/Ctorch-tutorial.zip)包含课程、手册、示例代码和数学字体，解压后打开 `index.html` 即可阅读。
 
 [One Forth](https://one-forth.com) · [GitHub 仓库](https://github.com/CSZSmaf/Ctorch) · [版本下载](https://github.com/CSZSmaf/Ctorch/releases/latest)
 
-Release 提供源码和离线教程压缩包。源码包使用本地编译器构建；离线教程包解压后打开 `index.html` 即可阅读，无需安装依赖。
+Release 提供对应版本的源码和教程压缩包。源码包使用本地编译器构建。最新教程可通过上方的离线教程链接下载。
 
 ## 特性
 

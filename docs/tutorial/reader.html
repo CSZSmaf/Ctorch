@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>{{TITLE}} · Ctorch</title>
+  <link rel="canonical" href="https://ctorch.one-forth.com/{{PAGE}}">
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="{{ROOT}}style.css">
+  <script src="{{ROOT}}interface.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#content">跳到正文</a>
+  <header class="site-header">
+    <button class="icon-button menu-button" id="menu" aria-label="打开目录" aria-controls="sidebar" aria-expanded="false">☰</button>
+    <a class="brand" href="{{ROOT}}index.html"><span class="brand-mark" aria-hidden="true">C<span>·</span></span>Ctorch<span class="brand-section"> / 文档</span></a>
+    <nav class="top-links" aria-label="文档导航"><a href="{{ROOT}}index.html">教程</a><a href="{{ROOT}}manual/index.html">手册</a><a href="{{ROOT}}examples/index.html">示例</a></nav>
+    <div class="header-actions">
+      <button class="icon-button" id="theme" aria-label="切换深色主题" title="切换主题">◐</button>
+      <a class="github-link" href="https://github.com/CSZSmaf/Ctorch">GitHub ↗</a>
+    </div>
+  </header>
+  <div class="page-shell">
+    <aside class="sidebar" id="sidebar" aria-label="文档目录">
+      <div class="sidebar-title">文档目录</div>
+      <nav id="document-nav"><a href="{{ROOT}}index.html">交互教程</a>{{NAVIGATION}}</nav>
+    </aside>
+    <button class="sidebar-scrim" id="scrim" aria-label="关闭目录" hidden></button>
+    <main class="reader" id="content" tabindex="-1">
+      <div class="breadcrumb"><a href="{{ROOT}}index.html">Ctorch</a><span>/</span><strong>{{TITLE}}</strong></div>
+      <article>{{CONTENT}}</article>
+      <footer class="article-footer"><a href="{{ROOT}}index.html">教程</a><a href="{{ROOT}}manual/index.html">手册目录</a><a href="https://one-forth.com">One Forth</a><a href="https://github.com/CSZSmaf/Ctorch">GitHub</a></footer>
+    </main>
+    <aside class="toc" aria-label="本页目录"><div class="toc-title">本页内容</div><nav id="page-toc">{{TOC}}</nav></aside>
+  </div>
+  <div id="toast" class="toast" role="status" hidden></div>
+</body>
+</html>

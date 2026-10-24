@@ -9,6 +9,7 @@
   <link rel="canonical" href="https://ctorch.one-forth.com/">
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="style.css">
+  <script src="interface.js" defer></script>
   <script src="tutorial.js" defer></script>
 </head>
 <body>
@@ -16,7 +17,7 @@
   <header class="site-header">
     <button class="icon-button menu-button" id="menu" aria-label="打开课程目录" aria-controls="sidebar" aria-expanded="false">☰</button>
     <a class="brand" href="#quickstart" aria-label="Ctorch 教程首页"><span class="brand-mark" aria-hidden="true">C<span>·</span></span>Ctorch<span class="brand-section"> / 教程</span></a>
-    <nav class="top-links" aria-label="文档导航"><a href="https://one-forth.com">One Forth</a><a href="../architecture.md">架构</a><a href="../../examples/README.md">示例</a></nav>
+    <nav class="top-links" aria-label="文档导航"><a href="https://one-forth.com">One Forth</a><a href="../README.md">手册</a><a href="../../examples/README.md">示例</a></nav>
     <div class="header-actions">
       <button id="search-open" class="search-trigger" aria-label="搜索教程"><span aria-hidden="true">⌕</span> <span class="search-label">搜索文档</span><kbd>Ctrl K</kbd></button>
       <button class="icon-button" id="theme" aria-label="切换深色主题" title="切换主题">◐</button>
@@ -44,7 +45,7 @@
         <a href="#reference"><span class="lesson-number">12</span>API 与示例索引<span class="done-mark"></span></a>
       </nav>
       <div class="course-progress"><span>已读章节</span><strong id="progress-text">0 / 12</strong><progress id="progress" max="12" value="0" aria-label="已读章节"></progress></div>
-      <a class="sidebar-reference" href="../build.md">构建与安装手册 <span>↗</span></a>
+      <a class="sidebar-reference" href="../build.md">构建与安装手册 <span aria-hidden="true">→</span></a>
     </aside>
     <button class="sidebar-scrim" id="scrim" aria-label="关闭课程目录" hidden></button>
     <main id="content" tabindex="-1">
@@ -52,7 +53,7 @@
 
       <article class="lesson" id="quickstart" data-title="快速开始" data-description="构建 Ctorch 并运行线性回归。">
         <h1>快速开始</h1>
-        <p class="lead">本节构建 Ctorch，并用线性回归学习 <span class="math">y = 2x + 1</span>。示例只需要 CPU。</p>
+        <p class="lead">本节构建 Ctorch，并用线性回归学习 <span class="math" data-tex="y = 2x + 1">y = 2x + 1</span>。示例只需要 CPU。</p>
         <p>本教程需要 C++ 基础。代码示例使用 C++20。交互演示由浏览器中的 JavaScript 计算，C++ 程序需要使用 Ctorch 编译运行。</p>
         <p>入门课程按张量、数据、模型、梯度、训练、保存恢复的顺序组织。完成保存恢复后即可编写 CPU 训练程序。自定义模块、CUDA 和扩展接口可按实际需要阅读。</p>
         <h2 id="quickstart-cycle">训练步骤</h2>
@@ -69,7 +70,7 @@
           <div class="workflow-detail" aria-live="polite"><code id="workflow-code">auto input = dl::from_span&lt;float&gt;(x, {5, 1});</code><p id="workflow-text">把五个样本放入一个批次。shape 的第一维是样本数，第二维是每个样本的特征数。</p></div>
         </div>
         <h2 id="quickstart-build">构建并运行</h2>
-        <p>从 <a href="https://github.com/CSZSmaf/Ctorch">GitHub 仓库</a>取得代码，或在<a href="https://github.com/CSZSmaf/Ctorch/releases/latest">版本下载</a>中下载源码包。离线教程包解压后打开根目录的 index.html 即可阅读。</p>
+        <p>从 <a href="https://github.com/CSZSmaf/Ctorch">GitHub 仓库</a>取得代码，或在<a href="https://github.com/CSZSmaf/Ctorch/releases/latest">版本下载</a>中下载源码包。<a href="https://ctorch.one-forth.com/Ctorch-tutorial.zip">离线教程包</a>解压后打开根目录的 index.html 即可阅读。</p>
         <p>在仓库根目录执行。需要 CMake 3.24+、Ninja 和支持 C++20 的编译器；Windows 可使用已配置的 MSVC 开发终端。</p>
         <pre data-language="Shell"><code>cmake --preset cpu -DCTORCH_BUILD_EXAMPLES=ON
 cmake --build --preset cpu --target ctorch_first_training</code></pre>
@@ -274,6 +275,8 @@ auto logits = model(dl::zeros({16, 2}));  // [16, 2]</code></pre>
         <p>第一层有 8×2 个权重和 8 个偏置。第二层有 2×8 个权重和 2 个偏置，总共 42 个参数。ReLU 没有参数。加入非线性激活后，多层网络才不等价于一次线性变换。<code>dl::summary(model)</code> 可以查看模块和参数数量。</p>
         <h2 id="models-logits">分类分数、概率与损失</h2>
         <p>logits 是模型输出的类别分数，可以为负，也不要求相加等于 1。softmax 把分数转换为非负且总和为 1 的概率。argmax 返回最大分数的位置，也就是预测类别编号。</p>
+        <span class="math-display" data-display data-tex="p_i = \frac{e^{z_i}}{\sum_{j=0}^{C-1}e^{z_j}}, \qquad L = -\log p_y">pᵢ = exp(zᵢ) / Σⱼ exp(zⱼ)，L = −log(pᵧ)</span>
+        <p>C 是类别数，zᵢ 是类别 i 的分数，pᵢ 是对应概率。y 是真实类别编号，L 是单个样本的交叉熵损失。</p>
         <div class="lab">
   <div class="lab-heading"><span class="lab-tag">二分类输出</span><span>类别 0 的分数固定为 0</span></div>
   <label class="range-label" for="logit-score">类别 1 的分数 <output id="logit-value">2.0</output></label>
@@ -335,13 +338,15 @@ auto encoded = encoder.forward(features, keep); // [4, 16, 32]</code></pre>
         <p class="lead">自动求导根据前向运算计算梯度。同一变量参与多个分支时，反向传播会把各分支的梯度相加。</p>
         <h2 id="autograd-chain">计算图与链式法则</h2>
         <p>前向计算把张量运算连接为计算图。参数通常是手动创建的叶张量，前向产生的中间张量记录自己的来源。开启求导的浮点叶张量可以通过 grad() 取得累计梯度。</p>
-        <p>如果 h=3x、L=h²，那么 dL/dh=2h、dh/dx=3，链式法则给出 dL/dx=6h=18x。x=2 时梯度为 36。多个分支使用同一个变量时，各分支的贡献再相加。</p>
+        <p>设 <span class="math" data-tex="h=3x">h=3x</span>，损失为 <span class="math" data-tex="L=h^2">L=h²</span>。链式法则把两步求导的结果相乘：</p>
+        <span class="math-display" data-display data-tex="\frac{dL}{dx} = \frac{dL}{dh}\frac{dh}{dx} = 2h \cdot 3 = 18x">dL/dx = (dL/dh)(dh/dx) = 2h × 3 = 18x</span>
+        <p>输入 x=2 时，梯度为 36。多个分支使用同一个变量时，各分支的梯度相加。</p>
         <h2 id="autograd-graph">分支梯度相加</h2>
         <div class="lab">
-          <div class="lab-heading"><span class="lab-tag">链式法则</span><span class="math">L = x² + x</span></div>
+          <div class="lab-heading"><span class="lab-tag">链式法则</span><span class="math" data-tex="L = x^2 + x">L = x² + x</span></div>
           <label class="range-label" for="gradient-x">输入 x <output id="gradient-x-value">2.0</output></label><input id="gradient-x" type="range" min="-3" max="3" step="0.1" value="2">
-          <div class="gradient-paths"><div class="math-node">x<span id="graph-x">2.0</span></div><div class="path-branches"><div>x × x <span>贡献 2x = <b id="gradient-square">4.0</b></span></div><div>x <span>贡献 1</span></div></div><div class="math-node accent">L<span id="graph-loss">6.00</span></div></div>
-          <div class="formula">dL/dx = 2x + 1 = <strong id="gradient-result">5.0</strong></div>
+          <div class="gradient-paths"><div class="math-node">x<span id="graph-x">2.0</span></div><div class="path-branches"><div><span data-tex="x \times x">x × x</span><span>贡献 <span data-tex="2x =">2x =</span> <b id="gradient-square">4.0</b></span></div><div>x <span>贡献 1</span></div></div><div class="math-node accent">L<span id="graph-loss">6.00</span></div></div>
+          <div class="formula"><span data-tex="\frac{dL}{dx} = 2x + 1 =">dL/dx = 2x + 1 =</span> <strong id="gradient-result">5.0</strong></div>
           <div class="lab-controls"><button id="backward" class="button primary">反向一次</button><button id="zero-gradient" class="button">清空梯度</button><span class="status" aria-live="polite">叶梯度 <strong id="accumulated-gradient">空</strong></span></div>
           <p class="lab-caption">每次点击代表重新前向，再执行 backward。移动 x 会开始一组新的演示；连续反向会累计叶梯度。</p>
         </div>
@@ -372,7 +377,7 @@ auto dx = gradients[0]-&gt;to_vector&lt;float&gt;();  // {4, 4, 4}</code></pre>
         <p>一次反向会消费当前计算图。需要再次反向时应重新执行前向。当前求导接口只建立一阶反向计算，不对反向过程继续构图。</p>
         <h2 id="autograd-freeze">冻结参数</h2>
         <p><code>parameter.requires_grad_(false)</code> 停止记录该参数的梯度。<code>module.requires_grad_(false)</code> 冻结整个子模块。冻结之前已有的梯度需清空。<code>eval()</code> 不会冻结参数，<code>requires_grad_</code> 也不会切换 Dropout 或 BatchNorm 的模式。</p>
-        <details class="exercise"><summary>练习：x=2 时对 L=x²+x 连续执行两次新的前向和反向，叶梯度是多少？</summary><p>第一次为 5，第二次累计为 10。两次之间调用 x.zero_grad() 后，第二次得到 5。重新前向是因为每次反向会消费对应的计算图。</p></details>
+        <details class="exercise"><summary>练习：x=2 时对 <span class="math" data-tex="L=x^2+x">L=x²+x</span> 连续执行两次新的前向和反向，叶梯度是多少？</summary><p>第一次为 5，第二次累计为 10。两次之间调用 x.zero_grad() 后，第二次得到 5。重新前向是因为每次反向会消费对应的计算图。</p></details>
       </article>
 
       <article class="lesson" id="training" data-title="优化器与训练" data-description="SGD、批次训练、评估指标、梯度累计和学习率调度。">
@@ -380,7 +385,7 @@ auto dx = gradients[0]-&gt;to_vector&lt;float&gt;();  // {4, 4, 4}</code></pre>
         <p class="lead">本节介绍参数更新、批次训练、评估指标和学习率调度。下面的线性回归演示使用快速开始中的五个样本。</p>
         <h2 id="training-lab">线性回归演示</h2>
         <div class="lab training-lab">
-          <div class="lab-heading"><span class="lab-tag">SGD 实验</span><span>ŷ = wx + b</span></div>
+          <div class="lab-heading"><span class="lab-tag">SGD 实验</span><span class="math" data-tex="\hat{y} = wx + b">ŷ = wx + b</span></div>
           <div class="training-charts"><figure><figcaption><span class="legend-dot target"></span>目标样本 <span class="legend-line"></span>当前预测</figcaption><svg id="fit-chart" viewBox="0 0 400 250" role="img" aria-label="线性回归预测与目标样本"></svg></figure><figure><figcaption>均方误差 <span class="muted">· log₁₀ 刻度</span></figcaption><svg id="loss-chart" viewBox="0 0 400 250" role="img" aria-label="每次更新后的均方误差"></svg></figure></div>
           <div class="metrics"><div><span>更新次数</span><strong id="train-step">0</strong></div><div><span>权重 w</span><strong id="train-weight">0.0000</strong></div><div><span>偏置 b</span><strong id="train-bias">0.0000</strong></div><div><span>当前 MSE</span><strong id="train-loss">9.0000</strong></div></div>
           <label class="range-label" for="learning-rate">学习率 η <output id="learning-rate-value">0.10</output></label><input id="learning-rate" type="range" min="0.01" max="0.45" step="0.01" value="0.1">
@@ -388,7 +393,13 @@ auto dx = gradients[0]-&gt;to_vector&lt;float&gt;();  // {4, 4, 4}</code></pre>
           <p class="lab-caption">这里直接计算同一个 MSE 和 SGD 公式，无动量、无权重衰减。浏览器使用 JavaScript 双精度；C++ 示例默认 FP32，舍入结果可能略有不同。</p>
         </div>
         <h2 id="training-equations">均方误差与 SGD</h2>
-        <div class="equation-card"><span>L = mean((wx + b − y)²)</span><span>∂L/∂w = 2 · mean((wx + b − y)x)</span><span>∂L/∂b = 2 · mean(wx + b − y)</span><strong>w ← w − η ∂L/∂w &nbsp;&nbsp; b ← b − η ∂L/∂b</strong></div>
+        <div class="equation-card">
+          <span class="math-display" data-display data-tex="L = \frac{1}{N}\sum_{i=1}^{N}(wx_i+b-y_i)^2">L = mean((wx + b − y)²)</span>
+          <span class="math-display" data-display data-tex="\frac{\partial L}{\partial w} = \frac{2}{N}\sum_{i=1}^{N}(wx_i+b-y_i)x_i">∂L/∂w = 2 · mean((wx + b − y)x)</span>
+          <span class="math-display" data-display data-tex="\frac{\partial L}{\partial b} = \frac{2}{N}\sum_{i=1}^{N}(wx_i+b-y_i)">∂L/∂b = 2 · mean(wx + b − y)</span>
+          <span class="math-display update-rule" data-display data-tex="w \leftarrow w-\eta\frac{\partial L}{\partial w}, \qquad b \leftarrow b-\eta\frac{\partial L}{\partial b}">w ← w − η ∂L/∂w；b ← b − η ∂L/∂b</span>
+        </div>
+        <p>N 是批次中的样本数。xᵢ 是第 i 个输入，yᵢ 是对应标签。w 是权重，b 是偏置，η 是学习率。</p>
         <p>初始梯度为 <code>dw = −8</code>、<code>db = −2</code>。学习率 0.1 时，第一次更新得到 <code>w = 0.8</code>、<code>b = 0.2</code>，更新后的 MSE 为 3.52。增大学习率后，参数可能在目标值两侧振荡。学习率过大会导致训练不收敛。</p>
         <h2 id="training-counts">训练循环的计数</h2>
         <p>数据章节的四样本示例每批读取两个样本，一轮完成两次更新。下面运行 20 轮，共完成 40 次更新。页面末尾的完整分类程序使用 64 个训练样本和 batch_size=16，一轮四次更新，20 轮共 80 次。</p>
@@ -461,7 +472,7 @@ prediction 1, class 1 probability 0.999995</code></pre>
         <p>restored step 80 表示已完成 80 次优化器更新。保存前后的验证指标相同，说明恢复后的参数用于同一验证集得到了相同结果。这个小数据集由固定规则生成，准确率 1.0 不能代表图像或文本任务的效果。</p>
         <h2 id="training-real">数据集训练示例</h2>
         <p>数据加载器负责采样顺序、批次整理与游标。训练集更新参数，验证集选择模型，测试集在选模完成后评估。优化器只在一个梯度累计窗口结束时更新。</p>
-        <div class="link-cards"><a href="../../examples/README.md"><strong>MNIST 分类 <span>↗</span></strong><p>MLP 与 CNN，完整的数据、验证和恢复入口。</p></a><a href="../../examples/byte_transformer.cpp"><strong>字节语言模型 <span>↗</span></strong><p>因果注意力、共享词表权重与下一字节预测。</p></a></div>
+        <div class="link-cards"><a href="../../examples/README.md"><strong>MNIST 分类 <span aria-hidden="true">→</span></strong><p>MLP 与 CNN，完整的数据、验证和恢复入口。</p></a><a href="../../examples/byte_transformer.cpp"><strong>字节语言模型 <span aria-hidden="true">→</span></strong><p>因果注意力、共享词表权重与下一字节预测。</p></a></div>
         <p>MNIST 与语言模型示例从指定文件读取数据。数据准备和运行参数见<a href="../../examples/README.md">示例说明</a>。</p>
       </article>
 
@@ -569,7 +580,7 @@ private:
         <div class="lab">
           <div class="lab-heading"><span class="lab-tag">参数绑定演示</span><span>input = 3</span></div>
           <div class="binding-switch" role="group" aria-label="参数来源"><button class="selected" data-binding="module" aria-pressed="true">普通调用 <small>模型自身 weight = 2</small></button><button data-binding="functional" aria-pressed="false">函数式调用 <small>外部状态 weight = 5</small></button></div>
-          <div class="formula">3 × bound(weight) = <strong id="binding-result">6</strong></div><p id="binding-text" class="lab-caption" aria-live="polite">普通调用读取模块登记的参数。外部状态的更改保留在自己的存储中。</p>
+          <div class="formula"><span data-tex="3 \times \operatorname{bound}(\mathrm{weight}) =">3 × bound(weight) =</span> <strong id="binding-result">6</strong></div><p id="binding-text" class="lab-caption" aria-live="polite">普通调用读取模块登记的参数。外部状态的更改保留在自己的存储中。</p>
         </div>
         <pre data-language="C++"><code>Scale model;
 dl::nn::FunctionalModule functional(model);
@@ -695,11 +706,11 @@ auto outputs = workspace({input, bias});</code></pre>
         <p class="lead">C17 接口用于 C 程序。custom_vjp 用于自定义反向计算。DLPack 用于交换张量存储。OpenVINO 扩展用于加载 ONNX 或 IR 模型并推理。</p>
         <h2 id="extensions-c">C17 接口的拥有权</h2>
         <p><code>&lt;dl/c_api.h&gt;</code> 提供 opaque handle 和状态码。创建和运算返回拥有型句柄，调用方通过对应的 release 结束生命周期；错误信息由 <code>dl_last_error()</code> 提供。</p>
-        <div class="link-cards"><a href="../../examples/c_train.c"><strong>C17 完整训练 <span>↗</span></strong><p>创建张量、训练线性回归、保存参数并释放句柄。</p></a><a href="../../examples/c_custom_vjp.c"><strong>C17 自定义 VJP <span>↗</span></strong><p>将外部前向和梯度回调接入自动求导。</p></a></div>
+        <div class="link-cards"><a href="../../examples/c_train.c"><strong>C17 完整训练 <span aria-hidden="true">→</span></strong><p>创建张量、训练线性回归、保存参数并释放句柄。</p></a><a href="../../examples/c_custom_vjp.c"><strong>C17 自定义 VJP <span aria-hidden="true">→</span></strong><p>将外部前向和梯度回调接入自动求导。</p></a></div>
         <h2 id="extensions-external">外部计算与张量交换</h2>
         <table><thead><tr><th>目标</th><th>入口</th><th>负责的内容</th></tr></thead><tbody><tr><td>组合已有算子</td><td>普通函数 / Module</td><td>由已有算子自动连接梯度。</td></tr><tr><td>外部数值计算</td><td><code>custom_vjp</code></td><td>提供前向及输入梯度公式。</td></tr><tr><td>共享张量存储</td><td>DLPack 扩展</td><td>转交存储拥有权与设备 stream 依赖；求导由应用连接。</td></tr><tr><td>Intel NPU 推理</td><td>OpenVINO 扩展</td><td>编译静态 ONNX / IR，管理推理请求与宿主输入输出。</td></tr></tbody></table>
         <h2 id="extensions-vjp">自定义 VJP</h2>
-        <p>VJP 表示上游梯度与局部雅可比矩阵的乘积。下面为 <code>y = factor × x²</code> 提供反向公式。外部计算也可以按相同方式接入。</p>
+        <p>VJP 表示上游梯度与局部雅可比矩阵的乘积。下面为 <span class="math" data-tex="y = \mathrm{factor} \cdot x^2">y = factor × x²</span> 提供反向公式。外部计算也可以按相同方式接入。</p>
         <pre data-language="C++" data-source="../../examples/custom_vjp.cpp"><code>dl::Tensor scaled_square(const dl::Tensor&amp; input, double factor) {
     return dl::custom_vjp({input},
         [factor](dl::VjpContext&amp; context, std::span&lt;const dl::Tensor&gt; values) {
@@ -739,7 +750,7 @@ request.wait();
 auto output = request.output();</code></pre>
         <p>一个请求完成后再复用其输入和输出。并行推理使用不同的请求对象，<code>output_into</code> 可复用输出缓冲区。NPU 路径目前用于推理，不提供 NPU 训练或 Ctorch 模型导出器。</p>
         <h2 id="extensions-next">扩展示例与手册</h2>
-        <div class="link-cards"><a href="../extensions.md"><strong>扩展手册 <span>↗</span></strong><p>了解 VJP、DLPack 拥有权与 CUDA 交接。</p></a><a href="../npu.md"><strong>NPU 手册 <span>↗</span></strong><p>了解异步请求、缓冲复用与 OpenVINO 依赖。</p></a></div>
+        <div class="link-cards"><a href="../extensions.md"><strong>扩展手册 <span aria-hidden="true">→</span></strong><p>了解 VJP、DLPack 拥有权与 CUDA 交接。</p></a><a href="../npu.md"><strong>NPU 手册 <span aria-hidden="true">→</span></strong><p>了解异步请求、缓冲复用与 OpenVINO 依赖。</p></a></div>
         <p>扩展算子后，可使用<a href="../../tests/README.md">独立测试入口</a>比较前向结果与数值梯度。测试目标默认关闭。</p>
       </article>
 
@@ -791,7 +802,7 @@ auto output = request.output();</code></pre>
       <nav class="lesson-pagination" aria-label="前后课程"><a id="previous" href="#quickstart"><small>上一节</small><strong>快速开始</strong></a><a id="next" href="#tensors"><small>下一节 <span>→</span></small><strong>张量与存储</strong></a></nav>
       <footer class="article-footer"><a href="https://one-forth.com">One Forth</a><a href="https://github.com/CSZSmaf/Ctorch">GitHub</a><a href="https://github.com/CSZSmaf/Ctorch/releases/latest">版本下载</a><button id="print" class="text-button">打印本节</button></footer>
     </main>
-    <aside class="toc" aria-label="本页目录"><div class="toc-title">本页内容</div><nav id="page-toc"></nav><a class="toc-source" href="https://github.com/CSZSmaf/Ctorch/tree/main/docs/tutorial">查看教程源文件 ↗</a></aside>
+    <aside class="toc" aria-label="本页目录"><div class="toc-title">本页内容</div><nav id="page-toc"></nav><a class="toc-source" href="./README.md">教程说明</a></aside>
   </div>
   <dialog id="search-dialog" aria-labelledby="search-title">
     <div class="search-top"><label id="search-title" for="search-input">搜索教程</label><button class="icon-button" id="search-close" aria-label="关闭搜索">×</button></div>

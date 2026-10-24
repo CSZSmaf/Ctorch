@@ -49,7 +49,7 @@ button:disabled { opacity: .55; cursor: default; }
 [hidden] { display: none !important; }
 p { margin: 12px 0 20px; }
 strong { font-weight: 650; }
-code, pre, kbd, .metrics strong, .formula, .equation-card, .state-cards strong {
+code, pre, kbd, .metrics strong, .state-cards strong {
   font-family: "Cascadia Code", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
 :not(pre) > code { font-size: .87em; background: var(--subtle); padding: 2px 5px; border-radius: 4px; overflow-wrap: anywhere; }
@@ -78,9 +78,9 @@ kbd { border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; font-
 .sidebar-title { font-size: 13px; margin-bottom: 20px; color: var(--ink); font-weight: 700; }
 .nav-group { font-weight: 650; font-size: 13px; margin: 20px 0 7px 10px; }
 .nav-group:first-child { margin-top: 0; }
-#lesson-nav a { display: flex; gap: 12px; align-items: center; border-left: 2px solid transparent; border-radius: 0 5px 5px 0; padding: 7px 9px; font-size: 14px; color: var(--ink); text-decoration: none; line-height: 1.6; margin: 2px 0; }
-#lesson-nav a:hover { background: var(--surface); color: var(--ink); }
-#lesson-nav a[aria-current="page"] { background: var(--accent-soft); border-left-color: var(--accent-bright); color: var(--accent); font-weight: 600; }
+:is(#lesson-nav, #document-nav) a { display: flex; gap: 12px; align-items: center; border-left: 2px solid transparent; border-radius: 0 5px 5px 0; padding: 7px 9px; font-size: 14px; color: var(--ink); text-decoration: none; line-height: 1.6; margin: 2px 0; }
+:is(#lesson-nav, #document-nav) a:hover { background: var(--surface); color: var(--ink); }
+:is(#lesson-nav, #document-nav) a[aria-current="page"] { background: var(--accent-soft); border-left-color: var(--accent-bright); color: var(--accent); font-weight: 600; }
 .lesson-number { font-family: Consolas, monospace; font-size: 11px; opacity: .8; }
 .done-mark { margin-left: auto; color: var(--green); }
 .course-progress { display: flex; flex-wrap: wrap; justify-content: space-between; margin: 24px 10px; font-size: 13px; color: var(--ink); }
@@ -157,7 +157,7 @@ td:first-child { min-width: 118px; }
 .math-node.accent { border-color: var(--accent); color: var(--accent); }
 .path-branches { flex: 1; max-width: 280px; }
 .path-branches > div { padding: 12px 0; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; gap: 10px; font-family: Consolas, monospace; }
-.path-branches span { font-size: 14px; color: var(--ink); }
+.path-branches > div > span { font-size: 14px; color: var(--ink); }
 .formula { text-align: center; padding: 15px 0; font-size: 17px; }
 .formula strong { color: var(--accent); font-size: 24px; }
 .training-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
@@ -176,8 +176,8 @@ svg .loss-line { stroke: var(--green); stroke-width: 2.5; fill: none; }
 .metrics span { font-size: 14px; color: var(--ink); display: block; }
 .metrics strong { display: block; font-size: 20px; font-weight: 500; margin-top: 3px; }
 .metrics.two { grid-template-columns: 1fr 1fr; text-align: center; margin-bottom: 0; }
-.equation-card { display: grid; gap: 12px; padding: 22px; background: var(--surface); border-radius: 7px; font-size: 13px; overflow-x: auto; }
-.equation-card strong { border-top: 1px solid var(--line); padding-top: 14px; color: var(--accent); font-weight: 500; }
+.equation-card { display: grid; gap: 12px; padding: 22px; background: var(--surface); border-radius: 7px; font-size: 16px; overflow-x: auto; }
+.equation-card > .update-rule { border-top: 1px solid var(--line); padding-top: 14px; color: var(--accent); font-weight: 500; }
 .probability-bars { display: grid; grid-template-columns: auto minmax(0, 1fr) 64px; align-items: center; gap: 12px; margin: 24px 0; }
 .probability-bars progress { width: 100%; height: 14px; appearance: none; background: var(--line); border: 0; }
 .probability-bars output { text-align: right; font-family: Consolas, monospace; }
@@ -296,7 +296,7 @@ dialog::backdrop { background: #111d2c66; backdrop-filter: blur(3px); }
   .gradient-paths { gap: 10px; }
   .math-node { min-width: 48px; padding: 8px; }
   .path-branches > div { font-size: 12px; }
-  .path-branches span { font-size: 14px; }
+  .path-branches > div > span { font-size: 14px; }
   .link-cards { grid-template-columns: 1fr; }
   .state-cards { grid-template-columns: 1fr; gap: 12px; }
   .state-cards code { font-size: 12px; }
@@ -318,7 +318,7 @@ dialog::backdrop { background: #111d2c66; backdrop-filter: blur(3px); }
   pre { font-size: 13px; padding: 18px; }
 }
 @media (prefers-reduced-motion: no-preference) {
-  .button, .workflow button, #lesson-nav a { transition: background .15s, border-color .15s; }
+  .button, .workflow button, :is(#lesson-nav, #document-nav) a { transition: background .15s, border-color .15s; }
 }
 @media print {
   .site-header, .sidebar, .toc, .breadcrumb, .lesson-completion, .lesson-pagination, .article-footer, .lab-controls, .code-toolbar, .tabs, .toast, .noscript { display: none !important; }
@@ -329,3 +329,14 @@ dialog::backdrop { background: #111d2c66; backdrop-filter: blur(3px); }
   .lab, pre, table { break-inside: avoid; }
   a { color: inherit; }
 }
+
+/* 数学公式沿用数学字体；长公式与源文件在各自容器中横向滚动。 */
+.katex { font-size: 1.08em; }
+.math-display { display: block; overflow-x: auto; overflow-y: hidden; }
+.math-display .katex-display { margin: .5em 0; text-align: left; }
+.formula strong { font-family: KaTeX_Main, "Times New Roman", serif; font-weight: 400; }
+.reader h1 { overflow-wrap: anywhere; }
+.reader pre { margin-bottom: 28px; }
+.reader .code-toolbar + pre { margin-top: 0; }
+.reader article { padding-bottom: 28px; }
+#page-toc .toc-depth-3 { padding-left: 26px; }

@@ -75,14 +75,16 @@ BatchNorm 使用保存的均值和方差，dropout 关闭。梯度仍然计算�
 
 测量使用上节的批量和模型，在一次 SGD 更新后计时。先预热 3 次，再运行 7 组、每组 5 次前向，取每组平均耗时的中位数。计时包含模型调用，不包含读取文件、载入权重、初始布局转换、反向传播或参数更新。
 
-| 模型 | Ctorch / ms | PyTorch / ms | TensorFlow / ms |
-| --- | ---: | ---: | ---: |
-| MLP，批量 32 | 0.068 | 0.059 | 0.232 |
-| LeNet，批量 16 | 1.144 | 0.548 | 0.732 |
-| ResNet-20，批量 4 | 14.634 | 3.886 | 8.988 |
-| Transformer，批量 2、长度 128 | 13.561 | 5.669 | 13.584 |
+| 模型 | Ctorch 普通分配 / ms | Ctorch 缓冲复用 / ms | PyTorch / ms | TensorFlow / ms |
+| --- | ---: | ---: | ---: | ---: |
+| MLP，批量 32 | 0.064 | 0.064 | 0.059 | 0.234 |
+| LeNet，批量 16 | 0.797 | 0.342 | 0.523 | 0.736 |
+| ResNet-20，批量 4 | 11.920 | 4.615 | 3.998 | 9.429 |
+| Transformer，批量 2、长度 128 | 11.246 | 8.475 | 5.688 | 13.812 |
 
-在这个配置下，Ctorch 的 MLP 前向耗时接近 PyTorch，Transformer 接近 TensorFlow。卷积模型与 PyTorch 仍有明显差距。批量、布局、设备和计算后端都会影响耗时。
+“缓冲复用”在计算外使用 `dl::MemoryGuard`，重复调用可以借用此前释放的存储。两种 Ctorch 配置使用相同内核、权重和输入，输出、梯度和 SGD 更新逐元素相同。写法和内存生命周期见[性能与内存](../performance.md)。
+
+在这个配置下，启用缓冲复用的 Ctorch LeNet 前向耗时低于 PyTorch，ResNet-20 约为 PyTorch 的 1.15 倍，Transformer 约为 1.49 倍。批量、布局、设备和计算后端都会影响耗时。
 
 PyTorch 和 TensorFlow 均直接使用 eager 算子，没有开启 `torch.compile` 或 `tf.function`。PyTorch 的 Python 环境为 3.14，TensorFlow 为 3.12。Ctorch/PyTorch 的图像布局是 NCHW，TensorFlow 使用 NHWC，布局转换在比较程序载入数据时完成。三个 Transformer 都使用普通矩阵运算实现因果注意力。
 

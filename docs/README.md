@@ -8,6 +8,7 @@
 | [张量与梯度](tensors.md) | 数据类型、设备、视图、算子与反向传播 |
 | [模型与训练](training.md) | 模块、优化器、数据加载、混合精度和检查点 |
 | [组合与执行](execution.md) | 函数式状态、随机 key、执行计划和激活重算 |
+| [性能与内存](performance.md) | 缓冲复用、C++ 内层循环和模型计时 |
 | [C17 与外部计算](extensions.md) | C 接口、自定义 VJP、DLPack 和 CUDA 交接 |
 | [OpenVINO / Intel NPU](npu.md) | 编译推理模型、输入输出与异步请求 |
 | [架构](architecture.md) | 模块分层、存储拥有权和后端组织 |

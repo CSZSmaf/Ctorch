@@ -39,13 +39,15 @@ dl::data::Batch inputs(std::string_view model, const std::filesystem::path& path
 } // namespace
 
 int main(int argc, char** argv) {
-    if (argc < 5 || argc > 6) {
+    const bool reuse_memory = std::string_view(argv[argc - 1]) == "--reuse-memory";
+    const auto positional = argc - reuse_memory;
+    if (positional < 5 || positional > 6) {
         std::cerr << "usage: ctorch_project_compare <mlp|lenet|resnet|transformer>"
-                  << " <weights.ct> <dataset-path> <output-directory> [cpu|device-index]\n";
+                  << " <weights.ct> <dataset-path> <output-directory> [cpu|device-index] [--reuse-memory]\n";
         return 1;
     }
     const std::string name = argv[1];
-    const auto device = argc == 6 && std::string_view(argv[5]) != "cpu"
+    const auto device = positional == 6 && std::string_view(argv[5]) != "cpu"
         ? dl::Device::cuda(std::stoi(argv[5])) : dl::Device::cpu();
     const std::filesystem::path output = argv[4];
     std::filesystem::create_directories(output);
@@ -57,6 +59,8 @@ int main(int argc, char** argv) {
     auto batch = inputs(name, argv[3]);
     batch.input = batch.input.to(device);
     batch.target = batch.target.to(device);
+    // 可选作用域让前向、反向与更新复用已释放的中间张量存储。
+    auto memory = reuse_memory ? std::make_unique<dl::MemoryGuard>() : nullptr;
     dl::io::save(output / "weights.ct", model->state_dict());
     auto logits = (*model)(batch.input);
     auto loss = dl::cross_entropy(logits.reshape({batch.target.numel(), logits.shape().back()}),
@@ -90,7 +94,8 @@ int main(int argc, char** argv) {
     report.open(output / "ctorch.json");
     report << std::setprecision(10) << "{\n  \"model\": \"" << name << "\",\n  \"parameters\": " << parameters
            << ",\n  \"loss\": " << loss.item<float>() << ",\n  \"forward_ms\": " << samples[3]
-           << ",\n  \"device\": \"" << (device.type == dl::DeviceType::cpu ? "cpu" : "cuda") << "\"\n}\n";
+           << ",\n  \"device\": \"" << (device.type == dl::DeviceType::cpu ? "cpu" : "cuda")
+           << "\",\n  \"reuse_memory\": " << (reuse_memory ? "true" : "false") << "\n}\n";
     std::cout << name << ": " << parameters << " parameters, loss " << loss.item<float>()
               << ", median forward " << samples[3] << " ms\n";
 }

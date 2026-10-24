@@ -33,23 +33,22 @@ public:
         }
     }
 
-    template <class Function> void for_each(Function&& function) const {
-        std::array<Index, Operands> offsets{};
+    /// 内层共享固定步长，外层负责坐标进位；标量张量作为长度一的行。
+    template <class Function> void for_each_row(Function&& function) const {
+        if (count_ == 0) return;
+        std::array<Index, Operands> offsets{}, steps{};
+        for (std::size_t operand = 0; operand < Operands; ++operand)
+            steps[operand] = shape_.empty() ? 0 : strides_[operand].back();
         if (shape_.size() <= 1) {
-            for (Index index = 0; index < count_; ++index) {
-                function(index, offsets);
-                for (std::size_t operand = 0; operand < Operands; ++operand) {
-                    offsets[operand] += shape_.empty() ? 0 : strides_[operand][0];
-                }
-            }
+            function(0, count_, offsets, steps);
             return;
         }
 
-        Shape coordinates(shape_.size(), 0);
-        // 混合布局沿逻辑坐标递增，每次进位同步调整各个操作数的地址偏移。
-        for (Index index = 0; index < count_; ++index) {
-            function(index, offsets);
-            for (std::size_t dim = shape_.size(); dim-- > 0;) {
+        const auto width = shape_.back();
+        Shape coordinates(shape_.size() - 1, 0);
+        for (Index index = 0; index < count_; index += width) {
+            function(index, width, offsets, steps);
+            for (std::size_t dim = coordinates.size(); dim-- > 0;) {
                 ++coordinates[dim];
                 for (std::size_t operand = 0; operand < Operands; ++operand) {
                     offsets[operand] += strides_[operand][dim];
@@ -63,6 +62,16 @@ public:
                 }
             }
         }
+    }
+
+    template <class Function> void for_each(Function&& function) const {
+        for_each_row([&](Index base, Index width, auto offsets, const auto& steps) {
+            for (Index column = 0; column < width; ++column) {
+                function(base + column, offsets);
+                for (std::size_t operand = 0; operand < Operands; ++operand)
+                    offsets[operand] += steps[operand];
+            }
+        });
     }
 
 private:

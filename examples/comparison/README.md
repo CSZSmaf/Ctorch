@@ -42,6 +42,14 @@ CPU 比较前设置 `OPENBLAS_NUM_THREADS=1` 和 `OMP_NUM_THREADS=1`。PyTorch �
 
 计时只包含模型前向，不包含数据读取、格式转换、反向传播或参数更新。测量在一次 SGD 更新后进行，预热 3 次，随后计时 7 组，每组 5 次，取组均值的中位数。CUDA 路径在计时边界同步设备。PyTorch 使用 eager，TensorFlow 使用 eager，均未启用图编译。
 
+在 Ctorch 命令末尾加上 `--reuse-memory`，可以测量开启 `dl::MemoryGuard` 的结果。它复用前向、反向和更新期间释放的缓冲，计算仍使用 eager 算子。例如：
+
+```sh
+../Ctorch-work/build/bin/ctorch_project_compare lenet ../Ctorch-work/runs/mnist-lenet/best.ct ../Ctorch-work/data/mnist ../Ctorch-work/comparison/lenet-reuse cpu --reuse-memory
+```
+
+`ctorch.json` 用 `reuse_memory` 记录是否启用了此作用域。原理和训练写法见[性能与内存](../../docs/performance.md)。
+
 Ctorch GPU 比较把最后一个参数改为设备编号 `0`，PyTorch 追加 `--device cuda`。本 TensorFlow 示例固定使用 CPU。
 
 ## 比较连续训练

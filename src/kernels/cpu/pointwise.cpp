@@ -46,7 +46,7 @@ template <class T, class Apply> void dispatch_unary(Unary operation, Apply apply
     case Unary::tanh: return apply([](T value) { return std::tanh(value); });
     case Unary::sigmoid: return apply([](T value) { return sigmoid_value(value); });
     case Unary::silu: return apply([](T value) { return value * sigmoid_value(value); });
-    case Unary::relu: return apply(relu_value<T>);
+    case Unary::relu: return apply([](T value) { return relu_value(value); });
     case Unary::gelu: break;
     }
     apply([](T value) {
@@ -145,6 +145,13 @@ void axpy(TensorData& target, const TensorData& input, double alpha) {
         } else {
             dl_axpy_f64(count, alpha, input.data<double>(), target.mutable_data<double>());
         }
+        return;
+    }
+    if (target.layout.is_contiguous()) {
+        visit_floating(input.dtype, [&]<class T> {
+            const auto factor = static_cast<T>(alpha);
+            cpu::binary<T>(target, input, target, [factor](T value, T delta) { return value + factor * delta; });
+        });
         return;
     }
     IterationPlan<2> plan(input.layout.sizes, {input.layout.strides, target.layout.strides});

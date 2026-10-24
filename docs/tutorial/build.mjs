@@ -29,6 +29,7 @@ const sections = {
     ["docs/tensors.md", "张量与梯度"],
     ["docs/training.md", "模型与训练"],
     ["docs/execution.md", "组合与执行"],
+    ["docs/performance.md", "性能与内存"],
     ["docs/extensions.md", "C17 与外部计算"],
     ["docs/npu.md", "OpenVINO / Intel NPU"],
     ["docs/architecture.md", "架构"],

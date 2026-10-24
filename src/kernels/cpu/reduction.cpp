@@ -26,14 +26,26 @@ void reduce_into(TensorData& result, const TensorData& input, const Shape& axes,
         // 首次覆盖填入归约单位元，已有目标从此前汇合的值继续计算。
         if (!accumulate) std::fill_n(target, result.layout.numel(),
             Maximum ? -std::numeric_limits<T>::infinity() : T{0});
-        plan.for_each([&](Index, const auto& offsets) {
-            auto& accumulated = target[offsets[1]];
-            const T value = source[offsets[0]];
+        auto combine = [](T accumulated, T value) {
             if constexpr (Maximum) {
                 // NaN 是最大值归约的吸收值，后续有限值保持已产生的 NaN。
-                accumulated = std::isnan(value) ? value : std::max(accumulated, value);
+                return std::isnan(value) ? value : std::max(accumulated, value);
             } else {
-                accumulated += value;
+                return accumulated + value;
+            }
+        };
+        plan.for_each_row([&](Index, Index width, const auto& offsets, const auto& steps) {
+            if (steps[1] == 0) {
+                // 同一行归约到一个值，累加器驻留在局部变量中，求和顺序保持不变。
+                T accumulated = target[offsets[1]];
+                for (Index column = 0; column < width; ++column)
+                    accumulated = combine(accumulated, source[offsets[0] + column * steps[0]]);
+                target[offsets[1]] = accumulated;
+            } else {
+                for (Index column = 0; column < width; ++column) {
+                    auto& accumulated = target[offsets[1] + column * steps[1]];
+                    accumulated = combine(accumulated, source[offsets[0] + column * steps[0]]);
+                }
             }
         });
     });

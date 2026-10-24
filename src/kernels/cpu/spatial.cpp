@@ -38,6 +38,23 @@ void column_rows(const SpatialGeometry& g, Function function) {
     }
 }
 
+template <class Function>
+void pool_windows(const Layout& layout, const SpatialGeometry& g, Function function) {
+    Index index = 0;
+    for (Index plane = 0; plane < g.batch * g.channels; ++plane) {
+        const auto offset = pixel_offset(layout, g, plane, 0, 0);
+        for (Index row = 0; row < g.output_height; ++row) {
+            const auto y = row * g.stride_height - g.padding_height;
+            const auto first_y = std::max(y, Index{0}), last_y = std::min(y + g.kernel_height, g.height);
+            for (Index column = 0; column < g.output_width; ++column) {
+                const auto x = column * g.stride_width - g.padding_width;
+                function(index++, PoolWindow{plane, first_y, last_y,
+                    std::max(x, Index{0}), std::min(x + g.kernel_width, g.width)}, offset);
+            }
+        }
+    }
+}
+
 } // namespace
 
 TensorData im2col(const TensorData& input, Size2 kernel, const Conv2dOptions& options) {
@@ -55,8 +72,12 @@ TensorData im2col(const TensorData& input, Size2 kernel, const Conv2dOptions& op
             }
             std::fill_n(row, first, T{0});
             auto position = pixel_offset(input.layout, g, plane, y, x + first * g.stride_width);
-            for (Index column = first; column < last; ++column, position += step)
-                row[column] = source[position];
+            if (step == 1 && first < last) {
+                std::copy_n(source + position, last - first, row + first);
+            } else {
+                for (Index column = first; column < last; ++column, position += step)
+                    row[column] = source[position];
+            }
             std::fill(row + last, row + g.output_width, T{0});
         });
     });
@@ -86,18 +107,17 @@ numeric::MaxPoolResult max_pool2d(const TensorData& input, const Pool2dOptions& 
     auto result = empty_data(spatial_output(g), input.dtype);
     auto indices = save_indices ? std::optional{empty_data(result.layout.sizes, DType::i64)} : std::nullopt;
     auto* selected = indices ? indices->mutable_data<Index>() : nullptr;
-    const auto count = result.layout.numel();
     visit_floating(input.dtype, [&]<class T> {
         const auto* source = input.data<T>();
         auto* target = result.mutable_data<T>();
-        for (Index index = 0; index < count; ++index) {
-            const auto region = g.pool_window(index);
+        pool_windows(input.layout, g, [&](Index index, const PoolWindow& region, Index plane) {
             T maximum = -std::numeric_limits<T>::infinity();
             Index best = -1;
             for (Index y = region.first_y; y < region.last_y; ++y) {
-                for (Index x = region.first_x; x < region.last_x; ++x) {
+                auto position = plane + y * input.layout.strides[2] + region.first_x * input.layout.strides[3];
+                for (Index x = region.first_x; x < region.last_x; ++x, position += input.layout.strides[3]) {
                     const auto logical = (region.plane * g.height + y) * g.width + x;
-                    const T value = source[pixel_offset(input.layout, g, region.plane, y, x)];
+                    const T value = source[position];
                     // NaN 随窗口结果传播，多个 NaN 由行优先最后一个位置承接梯度。
                     if (best < 0 || value > maximum || std::isnan(value)) {
                         maximum = value;
@@ -107,7 +127,7 @@ numeric::MaxPoolResult max_pool2d(const TensorData& input, const Pool2dOptions& 
             }
             target[index] = maximum;
             if (selected) selected[index] = best;
-        }
+        });
     });
     return {std::move(result), std::move(indices)};
 }
@@ -127,21 +147,20 @@ void max_pool2d_backward_into(TensorData& result, const TensorData& grad, const 
 TensorData avg_pool2d(const TensorData& input, const Pool2dOptions& options, bool count_include_pad) {
     const auto g = spatial_geometry(input.layout.sizes, options.kernel, options.stride, options.padding);
     auto result = empty_data(spatial_output(g), input.dtype);
-    const auto count = result.layout.numel();
     visit_floating(input.dtype, [&]<class T> {
         const auto* source = input.data<T>();
         auto* target = result.mutable_data<T>();
-        for (Index index = 0; index < count; ++index) {
-            const auto region = g.pool_window(index);
+        pool_windows(input.layout, g, [&](Index index, const PoolWindow& region, Index plane) {
             T total = 0;
             for (Index y = region.first_y; y < region.last_y; ++y) {
-                for (Index x = region.first_x; x < region.last_x; ++x) {
-                    total += source[pixel_offset(input.layout, g, region.plane, y, x)];
+                auto position = plane + y * input.layout.strides[2] + region.first_x * input.layout.strides[3];
+                for (Index x = region.first_x; x < region.last_x; ++x, position += input.layout.strides[3]) {
+                    total += source[position];
                 }
             }
             const auto divisor = count_include_pad ? g.kernel_height * g.kernel_width : region.count();
             target[index] = total / static_cast<T>(divisor);
-        }
+        });
     });
     return result;
 }

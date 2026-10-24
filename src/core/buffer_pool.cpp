@@ -1,4 +1,5 @@
 #include "core/buffer_pool.h"
+#include "dl/memory.h"
 
 #include <algorithm>
 #include <atomic>
@@ -75,3 +76,22 @@ std::shared_ptr<Storage> allocate_storage(std::size_t bytes, Device device) {
 }
 
 } // namespace dl::detail
+
+namespace dl {
+
+struct MemoryGuard::Impl {
+    detail::BufferPool pool;
+    detail::BufferPool* previous = detail::exchange_buffer_pool(&pool);
+};
+
+MemoryGuard::MemoryGuard() : impl_(std::make_unique<Impl>()) {}
+MemoryGuard::~MemoryGuard() { detail::exchange_buffer_pool(impl_->previous); }
+
+MemoryGuard::Stats MemoryGuard::memory_stats(Device device) const {
+    const auto stats = impl_->pool.stats(device);
+    return {stats.buffers, stats.in_use_buffers, stats.reserved_bytes, stats.in_use_bytes};
+}
+
+void MemoryGuard::release_unused_memory() { impl_->pool.release_unused(); }
+
+} // namespace dl

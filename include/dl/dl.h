@@ -7,6 +7,7 @@
 #include "dl/extension.h"
 #include "dl/functional.h"
 #include "dl/io.h"
+#include "dl/memory.h"
 #include "dl/inspect.h"
 #include "dl/nn.h"
 #include "dl/ops.h"

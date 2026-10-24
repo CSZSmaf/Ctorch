@@ -1,0 +1,42 @@
+{
+    "version": 5,
+    "cmakeMinimumRequired": { "major": 3, "minor": 24, "patch": 0 },
+    "configurePresets": [
+        {
+            "name": "cpu",
+            "displayName": "CPU library",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/../Ctorch-build/${presetName}",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "BUILD_SHARED_LIBS": "OFF",
+                "CTORCH_USE_CUDA": "OFF",
+                "CTORCH_USE_CUDNN": "OFF"
+            }
+        },
+        {
+            "name": "shared",
+            "displayName": "Shared CPU library",
+            "inherits": "cpu",
+            "cacheVariables": { "BUILD_SHARED_LIBS": "ON" }
+        },
+        {
+            "name": "cuda",
+            "displayName": "CUDA library",
+            "inherits": "cpu",
+            "cacheVariables": { "CTORCH_USE_CUDA": "ON" }
+        },
+        {
+            "name": "cudnn",
+            "displayName": "CUDA library with cuDNN",
+            "inherits": "cuda",
+            "cacheVariables": { "CTORCH_USE_CUDNN": "ON" }
+        }
+    ],
+    "buildPresets": [
+        { "name": "cpu", "configurePreset": "cpu" },
+        { "name": "shared", "configurePreset": "shared" },
+        { "name": "cuda", "configurePreset": "cuda" },
+        { "name": "cudnn", "configurePreset": "cudnn" }
+    ]
+}

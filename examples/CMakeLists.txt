@@ -1,9 +1,13 @@
 include(targets.cmake)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/bin")
 
-foreach(example IN ITEMS ${CTORCH_CPP_EXAMPLES} mnist_mlp mnist_cnn byte_transformer recurrent_train)
+foreach(example IN ITEMS ${CTORCH_CPP_EXAMPLES} mnist_mlp mnist_cnn mnist_lenet cifar_resnet
+                         byte_transformer shakespeare_transformer text_generate recurrent_train)
     ctorch_add_example(ctorch_${example} ${example}.cpp)
 endforeach()
+
+ctorch_add_example(ctorch_project_compare comparison/project_compare.cpp)
+ctorch_add_example(ctorch_compare_training comparison/train_mlp.cpp)
 
 if(CTORCH_USE_CUDA)
     ctorch_add_example(ctorch_cuda_memory cuda_memory.cpp)

@@ -13,7 +13,11 @@ cmake --build --preset cpu
 | --- | --- | --- |
 | ctorch_mnist_mlp | 解压后的 MNIST IDX 文件 | 两层 MLP |
 | ctorch_mnist_cnn | 相同的 MNIST 文件 | 卷积、BatchNorm、池化与分类器 |
+| ctorch_mnist_lenet | 相同的 MNIST 文件 | LeNet 风格卷积分类器 |
+| ctorch_cifar_resnet | CIFAR-10 binary 目录 | 272,474 参数的 ResNet-20 |
 | ctorch_byte_transformer | 本地文本文件 | 字节/位置 Embedding、因果 Transformer、共享词表权重 |
+| ctorch_shakespeare_transformer | 本地文本文件 | 4 层、宽度 128、上下文 128 的 Transformer |
+| ctorch_text_generate | 文本模型权重与前缀 | 自回归字节采样 |
 
 ```text
 ctorch_mnist_mlp <mnist-directory> <output-directory> [--device cpu|index] [--epochs N] [--batch-size N]
@@ -28,6 +32,8 @@ MNIST 目录包含标准解压文件名，像素缩放到 `[0,1]`。训练集前
 字节模型按原始文件的 90%/5%/5% 划分训练、验证和测试区间，再构造序列。目标是下一个字节，不足长度的目标使用忽略标签。程序共用加权指标、评估、最佳模型选择和更新边界快照；数据与输出位置由参数指定。
 
 ## 接口示例
+
+项目的下载、训练、恢复和预测步骤见[项目教程](../docs/projects/README.md)。[比较示例](comparison/README.md)使用相同数据和权重对比 PyTorch、TensorFlow 的结果，Python 依赖单独安装。
 
 | 文件 | 主题 |
 | --- | --- |

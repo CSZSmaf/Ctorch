@@ -17,7 +17,7 @@
   <header class="site-header">
     <button class="icon-button menu-button" id="menu" aria-label="打开课程目录" aria-controls="sidebar" aria-expanded="false">☰</button>
     <a class="brand" href="#quickstart" aria-label="Ctorch 教程首页"><span class="brand-mark" aria-hidden="true">C<span>·</span></span>Ctorch<span class="brand-section"> / 教程</span></a>
-    <nav class="top-links" aria-label="文档导航"><a href="https://one-forth.com">One Forth</a><a href="../README.md">手册</a><a href="../../examples/README.md">示例</a></nav>
+    <nav class="top-links" aria-label="文档导航"><a href="https://one-forth.com">One Forth</a><a href="../projects/README.md">项目</a><a href="../README.md">手册</a><a href="../../examples/README.md">示例</a></nav>
     <div class="header-actions">
       <button id="search-open" class="search-trigger" aria-label="搜索教程"><span aria-hidden="true">⌕</span> <span class="search-label">搜索文档</span><kbd>Ctrl K</kbd></button>
       <button class="icon-button" id="theme" aria-label="切换深色主题" title="切换主题">◐</button>
@@ -36,15 +36,16 @@
         <a href="#autograd"><span class="lesson-number">05</span>自动求导<span class="done-mark"></span></a>
         <a href="#training"><span class="lesson-number">06</span>优化器与训练<span class="done-mark"></span></a>
         <a href="#state"><span class="lesson-number">07</span>保存与恢复<span class="done-mark"></span></a>
+        <a href="#projects"><span class="lesson-number">08</span>实战项目与框架对比<span class="done-mark"></span></a>
         <div class="nav-group">自定义与设备扩展</div>
-        <a href="#modules"><span class="lesson-number">08</span>自定义模块<span class="done-mark"></span></a>
-        <a href="#precision"><span class="lesson-number">09</span>设备与混合精度<span class="done-mark"></span></a>
-        <a href="#execution"><span class="lesson-number">10</span>函数式状态与执行计划<span class="done-mark"></span></a>
-        <a href="#extensions"><span class="lesson-number">11</span>C17、DLPack 与 NPU<span class="done-mark"></span></a>
+        <a href="#modules"><span class="lesson-number">09</span>自定义模块<span class="done-mark"></span></a>
+        <a href="#precision"><span class="lesson-number">10</span>设备与混合精度<span class="done-mark"></span></a>
+        <a href="#execution"><span class="lesson-number">11</span>函数式状态与执行计划<span class="done-mark"></span></a>
+        <a href="#extensions"><span class="lesson-number">12</span>C17、DLPack 与 NPU<span class="done-mark"></span></a>
         <div class="nav-group">查阅</div>
-        <a href="#reference"><span class="lesson-number">12</span>API 与示例索引<span class="done-mark"></span></a>
+        <a href="#reference"><span class="lesson-number">13</span>API 与示例索引<span class="done-mark"></span></a>
       </nav>
-      <div class="course-progress"><span>已读章节</span><strong id="progress-text">0 / 12</strong><progress id="progress" max="12" value="0" aria-label="已读章节"></progress></div>
+      <div class="course-progress"><span>已读章节</span><strong id="progress-text">0 / 13</strong><progress id="progress" max="13" value="0" aria-label="已读章节"></progress></div>
       <a class="sidebar-reference" href="../build.md">构建与安装手册 <span aria-hidden="true">→</span></a>
     </aside>
     <button class="sidebar-scrim" id="scrim" aria-label="关闭课程目录" hidden></button>
@@ -556,6 +557,24 @@ auto prediction = model(input);</code></pre>
     progress.epoch = epoch + 1;
 }</code></pre>
         <p>这里的 model、optimizer、loader、scheduler 和 progress 都是恢复后的对象。循环应放在求导开启的作用域中。若在一轮中间保存，则先用 next 完成剩余批次，再 reset 开始下一轮，不能套用上面每轮先 reset 的写法。</p>
+      </article>
+
+      <article class="lesson" id="projects" data-title="实战项目与框架对比" data-description="用 MNIST、CIFAR-10 和 Shakespeare 数据训练完整模型，比较三个框架的结果。">
+        <h1>实战项目与框架对比</h1>
+        <p class="lead">这些项目提供完整的 C++ 训练程序、数据下载方法、模型说明和实际运行结果。</p>
+        <h2 id="projects-classic">经典分类项目</h2>
+        <div class="link-cards">
+          <a href="../projects/mnist.md#mlp"><strong>MNIST MLP <span aria-hidden="true">→</span></strong><p>从数据读取到手写数字预测，运行第一个完整分类项目。</p></a>
+          <a href="../projects/mnist.md#lenet"><strong>MNIST LeNet <span aria-hidden="true">→</span></strong><p>使用卷积和池化，计算每一层的特征尺寸。</p></a>
+        </div>
+        <h2 id="projects-larger">残差网络与语言模型</h2>
+        <div class="link-cards">
+          <a href="../projects/resnet.md"><strong>CIFAR-10 ResNet-20 <span aria-hidden="true">→</span></strong><p>组合残差模块和 BatchNorm，训练彩色图像分类器。</p></a>
+          <a href="../projects/transformer.md"><strong>Shakespeare Transformer <span aria-hidden="true">→</span></strong><p>训练四层因果 Transformer，从给定前缀生成文本。</p></a>
+        </div>
+        <h2 id="projects-comparison">比较训练结果和计算结果</h2>
+        <p><a href="../projects/comparison.md">框架结果对比</a>使用相同初始权重和样本顺序，对比 Ctorch、PyTorch、TensorFlow 的 MLP 训练结果。四种网络另外使用相同权重和输入比较输出、参数梯度、SGD 更新与 CPU 前向耗时。</p>
+        <p><a href="../projects/README.md">项目准备与代码组织</a>说明构建、数据下载、输出文件和恢复训练的方法。</p>
       </article>
 
       <article class="lesson" id="modules" data-title="自定义模块" data-description="登记参数，用 bound 让自定义层兼容普通与函数式调用。">

@@ -340,3 +340,8 @@ dialog::backdrop { background: #111d2c66; backdrop-filter: blur(3px); }
 .reader .code-toolbar + pre { margin-top: 0; }
 .reader article { padding-bottom: 28px; }
 #page-toc .toc-depth-3 { padding-left: 26px; }
+.comparison-chart { width: 100%; display: block; margin: 20px 0; }
+.comparison-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.comparison-controls select { color: var(--ink); background: var(--paper); border: 1px solid var(--line); padding: 6px 10px; border-radius: 5px; }
+.comparison-key { display: flex; flex-wrap: wrap; gap: 18px; }
+.comparison-key span::before { content: ""; display: inline-block; width: 14px; height: 3px; background: var(--curve-color); margin-right: 7px; vertical-align: middle; }

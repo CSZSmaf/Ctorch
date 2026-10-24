@@ -46,7 +46,8 @@ auto gradient = *x.grad();
 
 | 主题 | 内容 |
 | --- | --- |
-| [交互教程](docs/tutorial/README.md) | 十二节课程、八个交互演示与可编译示例 |
+| [交互教程](docs/tutorial/README.md) | 十三节课程、交互演示与可编译示例 |
+| [项目教程](docs/projects/README.md) | MLP、LeNet、ResNet、Transformer 与三框架实测对比 |
 | [架构](docs/architecture.md) | 张量、求导、数值层与后端职责 |
 | [张量与梯度](docs/tensors.md) | 类型、布局、别名、算子和梯度生命周期 |
 | [训练](docs/training.md) | 模块、优化器、数据、精度和保存恢复 |

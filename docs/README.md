@@ -4,6 +4,8 @@
 
 | 手册 | 内容 |
 | --- | --- |
+| [项目教程](projects/README.md) | 真实数据训练、经典模型和中等规模教学项目 |
+| [框架结果对比](projects/comparison.md) | 相同初值训练、输出与梯度误差、CPU 耗时 |
 | [构建与安装](build.md) | CPU、CUDA、cuDNN、OpenVINO 和 CMake 安装包 |
 | [张量与梯度](tensors.md) | 数据类型、设备、视图、算子与反向传播 |
 | [模型与训练](training.md) | 模块、优化器、数据加载、混合精度和检查点 |

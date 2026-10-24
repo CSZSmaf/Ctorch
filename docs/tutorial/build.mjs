@@ -12,6 +12,11 @@ const { Marked } = await import(pathToFileURL(require.resolve("marked")));
 const template = await readFile(join(source, "reader.html"), "utf8");
 const pages = new Map();
 const navigation = [
+  ["docs/projects/README.md", "项目教程"],
+  ["docs/projects/mnist.md", "MNIST：MLP 与 LeNet"],
+  ["docs/projects/resnet.md", "CIFAR-10：ResNet-20"],
+  ["docs/projects/transformer.md", "Shakespeare：Transformer"],
+  ["docs/projects/comparison.md", "框架结果对比"],
   ["docs/README.md", "手册目录"],
   ["docs/build.md", "构建与安装"],
   ["docs/tensors.md", "张量与梯度"],
@@ -29,7 +34,9 @@ const namedRoutes = new Map([
   ["docs/README.md", "manual/index.html"],
   ["docs/tutorial/README.md", "manual/tutorial.html"],
   ["examples/README.md", "examples/index.html"],
+  ["examples/comparison/README.md", "examples/comparison/index.html"],
   ["tests/README.md", "manual/testing.html"],
+  ["docs/projects/README.md", "projects/index.html"],
 ]);
 const escape = value => value.replaceAll("&", "&amp;")
   .replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
@@ -37,7 +44,8 @@ const relative = (page, target) => posix.relative(posix.dirname(page), target);
 
 // 链接同时登记待生成文件；手册与示例引用的文件会随网站一起发布。
 function route(file) {
-  const page = namedRoutes.get(file) || (file.endsWith(".md")
+  const page = namedRoutes.get(file) || (file.startsWith("docs/projects/")
+    ? file.replace(/^docs\//, "").replace(/\.md$/, ".html") : file.endsWith(".md")
     ? `manual/${posix.basename(file, ".md")}.html` : `source/${file}.html`);
   pages.set(file, page);
   return page;
@@ -63,11 +71,13 @@ function math(html) {
 function reader(file, page, title, body, headings = []) {
   const prefix = relative(page, "index.html").replace(/index\.html$/, "");
   const values = {
-    TITLE: escape(title), PAGE: page, ROOT: prefix, CONTENT: body,
+    TITLE: escape(title), PAGE: page, ROOT: prefix, CONTENT: math(body),
     NAVIGATION: navigation.map(([target, label]) =>
       `<a href="${relative(page, route(target))}"${target === file ? ' aria-current="page"' : ""}>${label}</a>`).join("\n"),
     TOC: headings.map(({ id, title, depth }) =>
       `<a href="#${id}" class="toc-depth-${depth}">${escape(title)}</a>`).join("\n"),
+    SCRIPTS: file === "docs/projects/comparison.md"
+      ? `<script src="${prefix}comparison-data.js" defer></script><script src="${prefix}comparison.js" defer></script>` : "",
   };
   return template.replace(/\{\{(\w+)\}\}/g, (_, key) => values[key]);
 }
@@ -77,7 +87,7 @@ const katexRoot = dirname(dirname(require.resolve("katex")));
 await cp(join(katexRoot, "dist/fonts"), join(destination, "assets/katex/fonts"), { recursive: true });
 await copyFile(join(katexRoot, "dist/katex.min.css"), join(destination, "assets/katex/katex.min.css"));
 await copyFile(join(katexRoot, "LICENSE"), join(destination, "assets/katex/LICENSE"));
-for (const file of ["style.css", "interface.js", "tutorial.js"]) {
+for (const file of ["style.css", "interface.js", "tutorial.js", "comparison-data.js", "comparison.js"]) {
   await copyFile(join(source, file), join(destination, file));
 }
 
@@ -120,7 +130,7 @@ for (const [file, page] of pages) {
     await save(page, reader(file, page, title, body, headings));
   } else {
     const title = posix.basename(file);
-    const language = file.endsWith(".c") ? "C17" : "C++";
+    const language = file.endsWith(".py") ? "Python" : file.endsWith(".c") ? "C17" : "C++";
     const download = `downloads/${file}`;
     await save(download, text);
     const body = `<h1>${title}</h1><p><a href="${relative(page, download)}" download>下载 ${title}</a></p>

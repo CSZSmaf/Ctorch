@@ -20,6 +20,4 @@ ctest --test-dir ../Ctorch-build/check -C Debug --output-on-failure
 
 有限差分检查避开不可微分点，测试失败会返回非零退出码。CPU 工作流在 Linux Debug 静态库和 Windows Release 共享库上运行同一入口。
 
-GPU/NPU 硬件覆盖、长时间训练、框架速度对比与大型数据实验适合独立开发目录。指定 `CTORCH_DEVELOPMENT_DIR` 后，CMake 可使用其 `tests/`；性能入口使用该目录的 `benchmarks/`。这里的 CPU 检查不代表所有设备或所有模型已经通过验证。
-
-将测试源文件与库分开维护，是 [PyTorch C++ frontend](https://github.com/pytorch/pytorch/tree/main/test/cpp/api)、[ggml](https://github.com/ggml-org/ggml/tree/master/tests) 和 [tinygrad](https://github.com/tinygrad/tinygrad/tree/master/test) 都采用的组织方式。Ctorch 保留必要的独立检查，构建产物与实验数据继续放在源码树之外。
+GPU/NPU 测试、长时间训练和性能比较可放在独立开发目录。指定 `CTORCH_DEVELOPMENT_DIR` 后，CMake 使用其中的 `tests/` 替代本目录；`CTORCH_BUILD_BENCHMARKS` 启用其中的 `benchmarks/`。

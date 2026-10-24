@@ -365,7 +365,7 @@ x.zero_grad();</code></pre>
         <pre data-language="C++"><code>model.eval();
 dl::NoGradGuard no_grad;
 auto prediction = model(input);</code></pre>
-        <div class="note"><strong>一次更新的梯度边界</strong><p>普通训练在每次更新前清空梯度。微批训练则先累计多个前向的加权损失梯度，再执行一次更新。Ctorch 当前提供一阶反向求导。</p></div>
+        <p>普通训练在每次更新前清空梯度。微批训练先累计多个前向的加权损失梯度，再执行一次更新。</p>
 
         <h2 id="autograd-grad">直接返回梯度</h2>
         <pre data-language="C++"><code>auto x = dl::full({3}, 2.0, {.requires_grad = true});
@@ -469,7 +469,7 @@ Metrics evaluate(dl::nn::Sequential&amp; model, dl::data::DataLoader&amp; loader
         <pre data-language="输出"><code>epoch 20, loss 0.027944, accuracy 1.000000
 restored step 80, loss 0.027944, accuracy 1.000000
 prediction 1, class 1 probability 0.999995</code></pre>
-        <p>restored step 80 表示已完成 80 次优化器更新。保存前后的验证指标相同，说明恢复后的参数用于同一验证集得到了相同结果。这个小数据集由固定规则生成，准确率 1.0 不能代表图像或文本任务的效果。</p>
+        <p>restored step 80 表示已完成 80 次优化器更新。保存前后的验证指标相同。accuracy 1.0 表示本例的 25 个验证样本全部分类正确。</p>
         <h2 id="training-real">数据集训练示例</h2>
         <p>数据加载器负责采样顺序、批次整理与游标。训练集更新参数，验证集选择模型，测试集在选模完成后评估。优化器只在一个梯度累计窗口结束时更新。</p>
         <div class="link-cards"><a href="../../examples/README.md"><strong>MNIST 分类 <span aria-hidden="true">→</span></strong><p>MLP 与 CNN，完整的数据、验证和恢复入口。</p></a><a href="../../examples/byte_transformer.cpp"><strong>字节语言模型 <span aria-hidden="true">→</span></strong><p>因果注意力、共享词表权重与下一字节预测。</p></a></div>
@@ -680,7 +680,7 @@ for (int step = 0; step &lt; 20; ++step) {
           <div class="lab-heading"><span class="lab-tag">执行计划示意</span><label class="check-label"><input type="checkbox" id="fusion" checked>启用逐元素融合</label></div>
           <div class="plan-flow"><div class="plan-inputs"><code>x</code><code>bias</code></div><span>→</span><div id="plan-operations" class="plan-operations"><span class="operation fused">Add + ReLU</span></div><span>→</span><code>output</code></div>
           <div class="metrics two"><div><span>计划操作数</span><strong id="plan-steps">1</strong></div><div><span>融合次数</span><strong id="plan-fusions">1</strong></div></div>
-          <p class="lab-caption">示意范围是相邻、单一消费者的 add → ReLU。融合减少一次调度及中间张量；这里展示结构，不测量运行速度。</p>
+          <p class="lab-caption">当 add 的结果仅供相邻的 ReLU 使用时，两次运算可以合并为一次，减少一次调度和一个中间张量。</p>
         </div>
         <pre data-language="C++" data-source="../../examples/execution_plan.cpp"><code>dl::plan::Graph graph;
 auto x = graph.input(dl::tensor_spec(input), "input");
@@ -693,7 +693,7 @@ auto workspace = plan.prepare();
 auto outputs = workspace({input, bias});</code></pre>
         <h2 id="execution-scope">何时使用固定计划</h2>
         <p>输入规格和执行路径稳定时，计划复用宿主调度结构与工作区。每次调用重新绑定输入和参数，新的求导图仍然在本次调用中建立。不同规格或路径对应新的计划。</p>
-        <p>运行时缓冲由实际持有者决定生命周期；长期保存输出会增加存活存储。计划不是通用 JIT，也不会把任意 C++ 控制流自动转换成图。多输出、激活重算与函数式组合见<a href="../execution.md">执行手册</a>。</p>
+        <p>输出张量和反向计算使用的中间值会保留其存储，释放这些引用后存储才可复用。图中的运算需要通过 <code>Graph</code> 接口逐项登记。多输出、激活重算与函数式组合见<a href="../execution.md">执行手册</a>。</p>
         <h2 id="execution-checkpoint">激活重算</h2>
         <pre data-language="C++"><code>auto features = dl::checkpoint({input, weight, bias}, [](auto values) {
     return dl::relu(dl::matmul(values[0], values[1]) + values[2]);
@@ -724,7 +724,7 @@ auto outputs = workspace({input, bias});</code></pre>
             return result;
         });
 }</code></pre>
-        <p>反向返回的每项对应一个输入，形状、类型和设备与该输入匹配。通过 save_for_backward 保留反向需要的值。前向与梯度公式需要一起验证，见 <a href="../../tests/README.md">tests</a>。</p>
+        <p>反向返回的每项对应一个输入，形状和设备与该输入相同。梯度使用输入的累积类型：f16、bf16 和 f32 使用 f32，f64 使用 f64。通过 <code>save_for_backward</code> 保留反向需要的值。前向与梯度的检查方法见<a href="../../tests/README.md">测试说明</a>。</p>
         <h2 id="extensions-dlpack">DLPack 存储交接</h2>
         <p>DLPack 扩展通过托管描述符共享张量存储。导入会消费描述符的拥有权，后续由接收方触发释放；已经消费的描述符不能再次转交。共享存储不等于共享求导图，跨框架反向需要 custom_vjp。</p>
         <p>CUDA 交接还需要建立生产方与消费方 stream 的依赖。具体导入、导出与同步步骤见<a href="../extensions.md">扩展手册</a>以及 <a href="../../examples/dlpack_vjp.cpp">dlpack_vjp.cpp</a>。</p>
@@ -748,7 +748,7 @@ request.start_async();
 // 此处可以准备下一次请求所需的数据。
 request.wait();
 auto output = request.output();</code></pre>
-        <p>一个请求完成后再复用其输入和输出。并行推理使用不同的请求对象，<code>output_into</code> 可复用输出缓冲区。NPU 路径目前用于推理，不提供 NPU 训练或 Ctorch 模型导出器。</p>
+        <p>一个请求完成后再复用其输入和输出。并行推理使用不同的请求对象，<code>output_into</code> 可复用输出缓冲区。</p>
         <h2 id="extensions-next">扩展示例与手册</h2>
         <div class="link-cards"><a href="../extensions.md"><strong>扩展手册 <span aria-hidden="true">→</span></strong><p>了解 VJP、DLPack 拥有权与 CUDA 交接。</p></a><a href="../npu.md"><strong>NPU 手册 <span aria-hidden="true">→</span></strong><p>了解异步请求、缓冲复用与 OpenVINO 依赖。</p></a></div>
         <p>扩展算子后，可使用<a href="../../tests/README.md">独立测试入口</a>比较前向结果与数值梯度。测试目标默认关闭。</p>

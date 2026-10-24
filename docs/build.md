@@ -60,6 +60,8 @@ target_link_libraries(model PRIVATE ctorch::ctorch)
 
 Windows 共享库调用需要将安装前缀的 `bin` 及所选后端的运行库目录加入当前进程的 DLL 搜索路径。安装包不复制 CUDA、cuDNN、BLAS 或 OpenVINO 的运行库。
 
+MinGW 构建的 OpenBLAS 通常还依赖 GCC、Fortran 和 OpenMP 运行库。将这些 DLL 所在目录一并加入 `PATH`。Windows 启动程序时报 `0xc0000135`，表示加载所需的 DLL 失败。
+
 `examples/installed` 演示仅通过安装包取得库：
 
 ```sh

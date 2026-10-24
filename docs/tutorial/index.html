@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="通过 C++ 示例和可交互的数学实验，学习 Ctorch 的张量、梯度、训练与扩展。">
+  <title>Ctorch · 从基础开始</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="style.css">
+  <script src="tutorial.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#content">跳到正文</a>
+  <header class="site-header">
+    <button class="icon-button menu-button" id="menu" aria-label="打开课程目录" aria-controls="sidebar" aria-expanded="false">☰</button>
+    <a class="brand" href="#quickstart" aria-label="Ctorch 教程首页"><span class="brand-mark" aria-hidden="true">C<span>·</span></span>Ctorch<span class="brand-section"> / 教程</span></a>
+    <nav class="top-links" aria-label="文档导航"><a class="current" href="#quickstart">从基础开始</a><a href="../architecture.md">架构</a><a href="../../examples/README.md">示例</a></nav>
+    <div class="header-actions">
+      <button id="search-open" class="search-trigger" aria-label="搜索教程"><span aria-hidden="true">⌕</span> <span class="search-label">搜索文档</span><kbd>Ctrl K</kbd></button>
+      <button class="icon-button" id="theme" aria-label="切换深色主题" title="切换主题">◐</button>
+      <a class="github-link" href="https://github.com/CSZSmaf/Ctorch" aria-label="在 GitHub 查看 Ctorch">GitHub <span aria-hidden="true">↗</span></a>
+    </div>
+  </header>
+  <div class="page-shell">
+    <aside class="sidebar" id="sidebar" aria-label="课程目录">
+      <div class="sidebar-title">LEARN THE BASICS</div>
+      <p class="sidebar-intro">从一个张量，到一次训练。</p>
+      <nav id="lesson-nav">
+        <div class="nav-group">基础</div>
+        <a href="#quickstart" aria-current="page"><span class="lesson-number">01</span>快速开始<span class="done-mark"></span></a>
+        <a href="#tensors"><span class="lesson-number">02</span>张量与存储<span class="done-mark"></span></a>
+        <a href="#autograd"><span class="lesson-number">03</span>自动求导<span class="done-mark"></span></a>
+        <div class="nav-group">构建与训练</div>
+        <a href="#training"><span class="lesson-number">04</span>训练一个模型<span class="done-mark"></span></a>
+        <a href="#modules"><span class="lesson-number">05</span>定义自己的层<span class="done-mark"></span></a>
+        <a href="#state"><span class="lesson-number">06</span>保存与恢复<span class="done-mark"></span></a>
+        <div class="nav-group">进一步探索</div>
+        <a href="#precision"><span class="lesson-number">07</span>设备与混合精度<span class="done-mark"></span></a>
+        <a href="#execution"><span class="lesson-number">08</span>函数式与执行计划<span class="done-mark"></span></a>
+        <a href="#extensions"><span class="lesson-number">09</span>C 接口与扩展<span class="done-mark"></span></a>
+      </nav>
+      <div class="course-progress"><span>你的学习进度</span><strong id="progress-text">0 / 9</strong><progress id="progress" max="9" value="0" aria-label="已完成课程"></progress><small>进度保存在当前浏览器。</small></div>
+      <a class="sidebar-reference" href="../build.md">构建与安装手册 <span>↗</span></a>
+      <div class="sidebar-note">C++20 · C17<br>离线可读，无需安装网页依赖。</div>
+    </aside>
+    <button class="sidebar-scrim" id="scrim" aria-label="关闭课程目录" hidden></button>
+    <main id="content" tabindex="-1">
+      <div class="breadcrumb">教程 <span>›</span> 从基础开始 <span>›</span> <strong id="breadcrumb-title">快速开始</strong></div>
+
+      <article class="lesson" id="quickstart" data-title="快速开始" data-description="构建 Ctorch，用五个步骤理解训练闭环。">
+        <div class="eyebrow">01 / 09 <span>QUICKSTART</span></div>
+        <h1>用 C++，理解一次学习。</h1>
+        <p class="lead">让模型从数据中学到 <span class="math">y = 2x + 1</span>。从张量、梯度到参数更新，每一步都用普通 C++ 表达。</p>
+        <div class="lesson-meta"><span>约 8 分钟</span><span>CPU 即可开始</span><span>需要 C++ 基础</span></div>
+        <div class="intro-note"><strong>一份可以动手的教程</strong><p>左侧按学习顺序阅读，右侧定位当前章节。交互区在浏览器中演示数学过程；C++ 示例下载后由本地 Ctorch 编译运行。</p></div>
+        <h2 id="quickstart-cycle">训练，发生在这五步之间</h2>
+        <p>点击任意一步，看看数据如何成为一次参数更新。</p>
+        <div class="lab workflow-lab">
+          <div class="lab-heading"><span class="lab-tag">交互导览</span><span>THE TRAINING LOOP</span></div>
+          <div class="workflow" id="workflow" aria-label="训练步骤">
+            <button data-stage="0" class="selected" aria-pressed="true"><span>01</span>准备数据</button><span class="flow-arrow">→</span>
+            <button data-stage="1" aria-pressed="false"><span>02</span>模型预测</button><span class="flow-arrow">→</span>
+            <button data-stage="2" aria-pressed="false"><span>03</span>计算损失</button><span class="flow-arrow">→</span>
+            <button data-stage="3" aria-pressed="false"><span>04</span>反向传播</button><span class="flow-arrow">→</span>
+            <button data-stage="4" aria-pressed="false"><span>05</span>更新参数</button>
+          </div>
+          <div class="workflow-detail" aria-live="polite"><code id="workflow-code">auto input = dl::from_span&lt;float&gt;(x, {5, 1});</code><p id="workflow-text">把五个样本放入一个批次。shape 的第一维是样本数，第二维是每个样本的特征数。</p></div>
+        </div>
+        <h2 id="quickstart-build">构建并运行</h2>
+        <p>在仓库根目录执行。需要 CMake 3.24+、Ninja 和支持 C++20 的编译器；Windows 可使用已配置的 MSVC 开发终端。</p>
+        <pre data-language="Shell"><code>cmake --preset cpu -DCTORCH_BUILD_EXAMPLES=ON
+cmake --build --preset cpu --target ctorch_first_training</code></pre>
+        <div class="tabs" role="tablist" aria-label="运行命令的操作系统">
+          <button id="tab-unix" role="tab" aria-selected="true" aria-controls="run-unix">Linux / macOS</button>
+          <button id="tab-windows" role="tab" aria-selected="false" aria-controls="run-windows" tabindex="-1">Windows</button>
+        </div>
+        <div id="run-unix" role="tabpanel" aria-labelledby="tab-unix"><pre data-language="Shell"><code>../Ctorch-build/cpu/bin/ctorch_first_training</code></pre></div>
+        <div id="run-windows" role="tabpanel" aria-labelledby="tab-windows" hidden><pre data-language="PowerShell"><code>..\Ctorch-build\cpu\bin\ctorch_first_training.exe</code></pre></div>
+        <h2 id="quickstart-code">一个完整的训练程序</h2>
+        <p>参数从零开始。经过 100 次 SGD 更新，权重接近 2、偏置接近 1；初始均方误差是 9。</p>
+        <pre data-language="C++20" data-source="../../examples/first_training.cpp"><code>#include &lt;dl/dl.h&gt;
+#include &lt;array&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    const std::array&lt;float, 5&gt; x{-2, -1, 0, 1, 2}, y{-3, -1, 1, 3, 5};
+    auto input = dl::from_span&lt;float&gt;(x, {5, 1});
+    auto target = dl::from_span&lt;float&gt;(y, {5, 1});
+    dl::nn::Linear model(dl::zeros({1, 1}, {.requires_grad = true}),
+                         dl::zeros({1}, {.requires_grad = true}));
+    dl::optim::SGD optimizer(model.parameters(), {.learning_rate = 0.1});
+
+    for (int step = 0; step &lt; 100; ++step) {
+        optimizer.zero_grad();
+        auto loss = dl::mse_loss(model(input), target);
+        loss.backward();
+        optimizer.step();
+    }
+    dl::NoGradGuard no_grad;
+    std::cout &lt;&lt; "weight " &lt;&lt; model.weight().item&lt;float&gt;()
+              &lt;&lt; ", bias " &lt;&lt; model.bias()-&gt;item&lt;float&gt;() &lt;&lt; '\n';
+}</code></pre>
+        <div class="note"><strong>你刚完成的闭环</strong><p>前向构图、损失求导和参数更新已经连在一起。下一节先放慢速度，看看 Tensor 如何描述数据，再在第 4 节亲手调整学习率。</p></div>
+      </article>
+
+      <article class="lesson" id="tensors" data-title="张量与存储" data-description="理解 shape、stride、transpose 与共享存储。">
+        <div class="eyebrow">02 / 09 <span>TENSORS</span></div>
+        <h1>形状会变，数据可以不动。</h1>
+        <p class="lead">Tensor 将数值存储、索引布局和求导身份连在一起。理解这三者，就能理解视图与复制的区别。</p>
+        <div class="lesson-meta"><span>约 7 分钟</span><span>浏览器数学演示</span></div>
+        <h2 id="tensors-layout">观察一次转置</h2>
+        <p>每个格子显示“值 / 存储下标”。选择一个元素，观察逻辑位置与底层存储之间的对应。</p>
+        <div class="lab">
+          <div class="lab-heading"><span class="lab-tag">布局实验</span><button id="transpose" class="button small" aria-pressed="false">转置矩阵</button></div>
+          <div class="layout-demo"><div><span class="field-label">逻辑视图</span><div id="tensor-grid" class="tensor-grid" aria-label="矩阵元素"></div></div><div class="layout-metadata"><code id="tensor-shape">shape = [2, 3]</code><code id="tensor-stride">stride = [3, 1]</code><p id="tensor-address" aria-live="polite">offset(0, 0) = 0 × 3 + 0 × 1 = 0</p></div></div>
+          <span class="field-label">共享存储 · 6 个连续的 float</span><div id="storage-strip" class="storage-strip" aria-label="底层存储"></div>
+          <p class="lab-caption">transpose 改变索引步长，底层六个值的顺序保持不变。</p>
+        </div>
+        <h2 id="tensors-create">创建与读取</h2>
+        <pre data-language="C++"><code>const float values[] = {1, 2, 3, 4, 5, 6};
+auto x = dl::from_span&lt;float&gt;(values, {2, 3});
+auto transposed = x.transpose(0, 1);
+std::cout &lt;&lt; dl::describe(transposed) &lt;&lt; '\n';
+auto independent = transposed.clone();</code></pre>
+        <p><code>describe</code> 只读取元信息。<code>to_vector&lt;float&gt;()</code> 按逻辑顺序取得宿主数值；读取 CUDA 数据时会产生设备传输。</p>
+        <h2 id="tensors-views">把视图与副本分清</h2>
+        <table><thead><tr><th>操作</th><th>存储与求导关系</th></tr></thead><tbody><tr><td>复制 Tensor 句柄</td><td>继续持有同一身份和存储。</td></tr><tr><td><code>transpose / slice</code></td><td>建立共享存储的视图，反向映射到输入。</td></tr><tr><td><code>clone()</code></td><td>复制数值，梯度仍可回到输入。</td></tr><tr><td><code>detach()</code></td><td>共享存储，脱离当前求导历史。</td></tr><tr><td><code>detach().clone()</code></td><td>获得独立、无历史的数值副本。</td></tr></tbody></table>
+        <p>广播可以让 <code>[2, 3]</code> 与 <code>[3]</code> 相加。反向时，广播出来的维度会归约回输入形状。更多算子见<a href="../tensors.md">张量与梯度手册</a>。</p>
+      </article>
+
+      <article class="lesson" id="autograd" data-title="自动求导" data-description="跟随 L = x² + x 的计算图，观察链式法则与梯度累计。">
+        <div class="eyebrow">03 / 09 <span>AUTOGRAD</span></div>
+        <h1>沿着计算，找到梯度。</h1>
+        <p class="lead">一次前向记录依赖，一次反向汇总贡献。一个变量经过多条路径使用时，这些路径的梯度会相加。</p>
+        <div class="lesson-meta"><span>约 6 分钟</span><span>浏览器数学演示</span></div>
+        <h2 id="autograd-graph">两条路径，一个梯度</h2>
+        <div class="lab">
+          <div class="lab-heading"><span class="lab-tag">链式法则</span><span class="math">L = x² + x</span></div>
+          <label class="range-label" for="gradient-x">输入 x <output id="gradient-x-value">2.0</output></label><input id="gradient-x" type="range" min="-3" max="3" step="0.1" value="2">
+          <div class="gradient-paths"><div class="math-node">x<span id="graph-x">2.0</span></div><div class="path-branches"><div>x × x <span>贡献 2x = <b id="gradient-square">4.0</b></span></div><div>x <span>贡献 1</span></div></div><div class="math-node accent">L<span id="graph-loss">6.00</span></div></div>
+          <div class="formula">dL/dx = 2x + 1 = <strong id="gradient-result">5.0</strong></div>
+          <div class="lab-controls"><button id="backward" class="button primary">反向一次</button><button id="zero-gradient" class="button">清空梯度</button><span class="status" aria-live="polite">叶梯度 <strong id="accumulated-gradient">空</strong></span></div>
+          <p class="lab-caption">每次点击代表重新前向，再执行 backward。移动 x 会开始一组新的演示；连续反向会累计叶梯度。</p>
+        </div>
+        <h2 id="autograd-code">求导与累计</h2>
+        <pre data-language="C++"><code>auto x = dl::full({}, 2.0, {.requires_grad = true});
+auto loss = x * x + x;
+loss.backward();
+std::cout &lt;&lt; x.grad()-&gt;item&lt;float&gt;();  // 5
+
+// 下一次前向建立新的计算图，叶梯度继续累计。
+(x * x + x).backward();
+std::cout &lt;&lt; x.grad()-&gt;item&lt;float&gt;();  // 10
+x.zero_grad();</code></pre>
+        <h2 id="autograd-eval">评估模式与求导模式</h2>
+        <p><code>model.eval()</code> 控制 Dropout、BatchNorm 等层的行为；<code>NoGradGuard</code> 控制是否记录求导图。评估通常同时使用二者。</p>
+        <pre data-language="C++"><code>model.eval();
+dl::NoGradGuard no_grad;
+auto prediction = model(input);</code></pre>
+        <div class="note"><strong>一次更新的梯度边界</strong><p>普通训练在每次更新前清空梯度。微批训练则先累计多个前向的加权损失梯度，再执行一次更新。Ctorch 当前提供一阶反向求导。</p></div>
+      </article>
+
+      <article class="lesson" id="training" data-title="训练一个模型" data-description="调节学习率，观察 SGD 如何学习 y = 2x + 1。">
+        <div class="eyebrow">04 / 09 <span>OPTIMIZATION</span></div>
+        <h1>看着误差，一步步变小。</h1>
+        <p class="lead">回到第一节的五个样本。你可以控制学习率与更新次数，观察参数、预测和损失一起变化。</p>
+        <div class="lesson-meta"><span>约 8 分钟</span><span>浏览器数学演示 · 双精度计算</span></div>
+        <h2 id="training-lab">亲手训练一条直线</h2>
+        <div class="lab training-lab">
+          <div class="lab-heading"><span class="lab-tag">SGD 实验</span><span>ŷ = wx + b</span></div>
+          <div class="training-charts"><figure><figcaption><span class="legend-dot target"></span>目标样本 <span class="legend-line"></span>当前预测</figcaption><svg id="fit-chart" viewBox="0 0 400 250" role="img" aria-label="线性回归预测与目标样本"></svg></figure><figure><figcaption>均方误差 <span class="muted">· log₁₀ 刻度</span></figcaption><svg id="loss-chart" viewBox="0 0 400 250" role="img" aria-label="每次更新后的均方误差"></svg></figure></div>
+          <div class="metrics"><div><span>更新次数</span><strong id="train-step">0</strong></div><div><span>权重 w</span><strong id="train-weight">0.0000</strong></div><div><span>偏置 b</span><strong id="train-bias">0.0000</strong></div><div><span>当前 MSE</span><strong id="train-loss">9.0000</strong></div></div>
+          <label class="range-label" for="learning-rate">学习率 η <output id="learning-rate-value">0.10</output></label><input id="learning-rate" type="range" min="0.01" max="0.45" step="0.01" value="0.1">
+          <div class="lab-controls"><button id="train-one" class="button primary">更新 1 步</button><button id="train-many" class="button">连续 50 步</button><button id="train-reset" class="button quiet">重置</button><span id="train-status" class="status" aria-live="polite">从 w = 0、b = 0 开始。</span></div>
+          <p class="lab-caption">这里直接计算同一个 MSE 和 SGD 公式，无动量、无权重衰减。浏览器使用 JavaScript 双精度；C++ 示例默认 FP32，舍入结果可能略有不同。</p>
+        </div>
+        <h2 id="training-equations">把更新写成数学</h2>
+        <div class="equation-card"><span>L = mean((wx + b − y)²)</span><span>∂L/∂w = 2 · mean((wx + b − y)x)</span><span>∂L/∂b = 2 · mean(wx + b − y)</span><strong>w ← w − η ∂L/∂w &nbsp;&nbsp; b ← b − η ∂L/∂b</strong></div>
+        <p>初始梯度为 <code>dw = −8</code>、<code>db = −2</code>。学习率 0.1 时，第一次更新得到 <code>w = 0.8</code>、<code>b = 0.2</code>，更新后的 MSE 为 3.52。试试较大的学习率，观察斜率如何振荡着接近目标。</p>
+        <h2 id="training-real">从五个样本走向真实数据</h2>
+        <p>数据加载器负责采样顺序、批次整理与游标。训练集更新参数，验证集选择模型，测试集在选模完成后评估。优化器只在一个梯度累计窗口结束时更新。</p>
+        <div class="link-cards"><a href="../../examples/README.md"><strong>MNIST 分类 <span>↗</span></strong><p>MLP 与 CNN，完整的数据、验证和恢复入口。</p></a><a href="../../examples/byte_transformer.cpp"><strong>字节语言模型 <span>↗</span></strong><p>因果注意力、共享词表权重与下一字节预测。</p></a></div>
+        <p>正式示例读取你提供的数据，不自动下载。数据准备与命令参数见<a href="../../examples/README.md">示例说明</a>。</p>
+      </article>
+
+      <article class="lesson" id="modules" data-title="定义自己的层" data-description="登记参数，用 bound 让自定义层兼容普通与函数式调用。">
+        <div class="eyebrow">05 / 09 <span>CUSTOM MODULES</span></div>
+        <h1>一个层，就是一段计算。</h1>
+        <p class="lead">继承 Module 管理状态，使用普通张量运算定义前向。我们从只有一个可学习参数的 Scale 层开始。</p>
+        <div class="lesson-meta"><span>约 7 分钟</span><span>可下载 C++ 示例</span></div>
+        <h2 id="modules-register">登记参数，再描述前向</h2>
+        <pre data-language="C++" data-source="../../examples/parameter_layer.cpp"><code>class Scale : public dl::nn::UnaryModule {
+public:
+    Scale() : weight_(register_parameter(
+        "weight", dl::full({}, 2.0, {.requires_grad = true}))) {}
+
+    dl::Tensor forward(const dl::Tensor&amp; input) override {
+        return input * bound(weight_);
+    }
+
+private:
+    dl::Tensor weight_;
+};</code></pre>
+        <p><code>register_parameter</code> 让优化器和状态保存能发现参数；<code>bound</code> 让前向读取本次调用的参数。同一层的参数、buffer 和子模块共用名称空间，名称非空、无点且唯一。</p>
+        <h2 id="modules-binding">同一个 forward，两份参数</h2>
+        <div class="lab">
+          <div class="lab-heading"><span class="lab-tag">参数绑定演示</span><span>input = 3</span></div>
+          <div class="binding-switch" role="group" aria-label="参数来源"><button class="selected" data-binding="module" aria-pressed="true">普通调用 <small>模型自身 weight = 2</small></button><button data-binding="functional" aria-pressed="false">函数式调用 <small>外部状态 weight = 5</small></button></div>
+          <div class="formula">3 × bound(weight) = <strong id="binding-result">6</strong></div><p id="binding-text" class="lab-caption" aria-live="polite">普通调用读取模块登记的参数。外部状态的更改保留在自己的存储中。</p>
+        </div>
+        <pre data-language="C++"><code>Scale model;
+dl::nn::FunctionalModule functional(model);
+auto state = functional.state();
+state.parameters[0] = dl::full({}, 5.0, {.requires_grad = true});
+auto input = dl::full({}, 3.0);
+auto result = functional.call(state, dl::RandomKey{7}, [&amp;] {
+    return model(input);  // bound(weight_) 在此读取外部状态。
+});</code></pre>
+        <h2 id="modules-inspect">看清模型的状态</h2>
+        <p><code>dl::summary(model)</code> 展示模块路径、训练模式、参数量、冻结状态和共享关系；<code>named_parameters()</code> 提供可遍历的名称与张量。</p>
+        <p>无参数的 SiLU 层只需组合乘法与 sigmoid。涉及外部数值计算时，可以转到第 9 节注册自定义 VJP。</p>
+      </article>
+
+      <article class="lesson" id="state" data-title="保存与恢复" data-description="区分状态视图和独立快照，保存完整训练进度。">
+        <div class="eyebrow">06 / 09 <span>STATE &amp; CHECKPOINTS</span></div>
+        <h1>保存的，是哪一刻的模型？</h1>
+        <p class="lead">状态表里的 Tensor 仍然连接着模型。希望留住某一时刻的参数，就创建一个独立快照。</p>
+        <div class="lesson-meta"><span>约 6 分钟</span><span>浏览器状态演示</span></div>
+        <h2 id="state-snapshot">视图会跟随，快照会停留</h2>
+        <div class="lab">
+          <div class="lab-heading"><span class="lab-tag">状态实验</span><span>初始 weight = 1</span></div>
+          <div class="state-cards"><div><code>model</code><strong id="state-model">1</strong><span>当前参数</span></div><div><code>state_dict()</code><strong id="state-view">1</strong><span>共享存储的状态表</span></div><div class="snapshot-card"><code>clone_state(...)</code><strong id="state-snapshot-value">1</strong><span>独立数值快照</span></div></div>
+          <div class="lab-controls"><button id="state-update" class="button primary">参数增加 1</button><button id="state-capture" class="button">重新取快照</button><button id="state-reset" class="button quiet">重置</button></div>
+        </div>
+        <pre data-language="C++"><code>auto view = model.state_dict();
+auto best = dl::clone_state(view);  // 独立 CPU 副本，脱离求导历史。
+// 后续更新改变 model 和 view，best 保留采集时的数值。
+model.load_state_dict(best);
+dl::io::save("weights.ct", model.state_dict());</code></pre>
+        <h2 id="state-resume">恢复训练也需要优化器状态</h2>
+        <pre data-language="C++"><code>// 在一次 optimizer.step() 完成后保存。
+auto saved = dl::io::capture_checkpoint(model, optimizer, {.step = 100});
+dl::io::save_checkpoint("training.ct", saved);
+
+// 先构造相同结构、迁移设备，再创建优化器。
+auto loaded = dl::io::load_checkpoint("training.ct");
+auto progress = dl::io::restore_checkpoint(loaded, model, optimizer);</code></pre>
+        <p>训练快照包含参数、buffer、优化器槽、训练进度和默认随机流。使用 DataLoader、调度器或 GradScaler 时，把对应对象一并传给快照接口。恢复从下一个更新窗口开始。</p>
+        <h2 id="state-shared">共享参数具有稳定名称</h2>
+        <p>同一张量登记在 <code>a.weight</code> 与 <code>b.weight</code> 时，以字典序最小的 <code>a.weight</code> 作为规范名，只更新一次。改变子模块登记顺序不改变规范名。</p>
+        <p><code>state_aliases()</code> 展示其他路径与规范名的对应。加载仍接受当前模块树中的旧别名，因此旧检查点可沿相同的登记路径恢复。模型路径本身改名需要应用明确迁移。</p>
+      </article>
+
+      <article class="lesson" id="precision" data-title="设备与混合精度" data-description="明确设备、参数精度、autocast 和梯度缩放各自的职责。">
+        <div class="eyebrow">07 / 09 <span>DEVICES &amp; PRECISION</span></div>
+        <h1>把计算放到合适的设备。</h1>
+        <p class="lead">CPU 与 CUDA 共享模型代码。设备迁移、前向计算精度与梯度缩放分别由清楚的接口管理。</p>
+        <div class="lesson-meta"><span>约 7 分钟</span><span>CUDA 示例需要对应构建</span></div>
+        <h2 id="precision-device">先迁移，再创建优化器</h2>
+        <pre data-language="C++"><code>const auto device = dl::Device::cuda(0);
+model.to(device);
+input = input.to(device);
+target = target.to(device);
+dl::optim::AdamW optimizer(model.parameters(), {.learning_rate = 0.001});</code></pre>
+        <p>主参数保持 FP32。autocast 选择 GEMM、卷积等算子的低精度输入，GradScaler 管理 FP16 梯度的数值范围。CUDA 构建方式见<a href="../build.md">构建手册</a>。</p>
+        <h2 id="precision-step">一个 FP16 更新窗口</h2>
+        <pre data-language="C++"><code>dl::GradScaler scaler;
+// 每次更新复用同一个 scaler，保留动态倍率。
+optimizer.zero_grad();
+auto loss = [&amp;] {
+    dl::AutocastGuard autocast(dl::DeviceType::cuda, dl::DType::f16);
+    return dl::mse_loss(model(input), target);
+}();
+scaler.scale(loss).backward();
+scaler.step(optimizer);  // 还原梯度、按有限性更新参数，再调整倍率。</code></pre>
+        <h2 id="precision-clip">需要裁剪时，显式还原一次</h2>
+        <p>将上例最后一行替换为以下代码。<code>unscale_</code> 原地还原梯度，裁剪读取还原后的数值，然后分别完成参数更新和倍率调整。</p>
+        <pre data-language="C++"><code>const bool finite = scaler.unscale_(optimizer);
+if (finite) {
+    dl::optim::clip_grad_norm(model.parameters(), 1.0);
+    optimizer.step();
+}
+scaler.update(finite);</code></pre>
+        <div class="note"><strong>读取数值也有成本</strong><p>CUDA 的 <code>item()</code> 和 <code>to_vector()</code> 会把数值带回 CPU。集中读取阶段指标，让连续的训练更新尽量留在设备上。</p></div>
+        <p>cuDNN 卷积和融合注意力属于可选后端。低精度舍入与运算次序可能不同，比较结果应使用相同输入、精度与适合该精度的误差标准。</p>
+      </article>
+
+      <article class="lesson" id="execution" data-title="函数式与执行计划" data-description="将参数、随机 key 和计算计划拆开组织，理解局部融合。">
+        <div class="eyebrow">08 / 09 <span>FUNCTIONS &amp; EXECUTION</span></div>
+        <h1>固定计算结构，显式传递状态。</h1>
+        <p class="lead">函数式调用把状态交给调用者。固定执行计划把可复用的计算结构交给运行时，两者都继续使用已有的张量与求导语义。</p>
+        <div class="lesson-meta"><span>约 9 分钟</span><span>浏览器结构演示</span></div>
+        <h2 id="execution-state">参数与随机性都可以成为输入</h2>
+        <p><code>FunctionalModule::state()</code> 交付独立参数和 buffer。<code>call</code> 读取外部参数，返回本次更新后的 buffer；调用者显式接回这些状态。</p>
+        <pre data-language="C++"><code>dl::nn::FunctionalModule functional(model);
+auto state = functional.state();
+dl::RandomKey key{73};
+auto result = functional.call(state, key, [&amp;] { return model(input); });
+state.buffers = std::move(result.buffers);
+++key.stream;  // 下一次前向使用新的显式随机流。
+auto gradients = dl::grad(dl::mean(result.output), state.parameters);</code></pre>
+        <h2 id="execution-fusion">从两次操作，到一次融合</h2>
+        <div class="lab">
+          <div class="lab-heading"><span class="lab-tag">执行计划示意</span><label class="check-label"><input type="checkbox" id="fusion" checked>启用逐元素融合</label></div>
+          <div class="plan-flow"><div class="plan-inputs"><code>x</code><code>bias</code></div><span>→</span><div id="plan-operations" class="plan-operations"><span class="operation fused">Add + ReLU</span></div><span>→</span><code>output</code></div>
+          <div class="metrics two"><div><span>计划操作数</span><strong id="plan-steps">1</strong></div><div><span>融合次数</span><strong id="plan-fusions">1</strong></div></div>
+          <p class="lab-caption">示意范围是相邻、单一消费者的 add → ReLU。融合减少一次调度及中间张量；这里展示结构，不测量运行速度。</p>
+        </div>
+        <pre data-language="C++" data-source="../../examples/execution_plan.cpp"><code>dl::plan::Graph graph;
+auto x = graph.input(dl::tensor_spec(input), "input");
+auto b = graph.input(dl::tensor_spec(bias), "bias");
+auto sum = graph.call(dl::plan::ops::add(), {x, b});
+auto y = graph.call(dl::plan::ops::relu(), {sum});
+auto plan = graph.compile({y});
+std::cout &lt;&lt; dl::describe(plan) &lt;&lt; '\n';
+auto workspace = plan.prepare();
+auto outputs = workspace({input, bias});</code></pre>
+        <h2 id="execution-scope">何时使用固定计划</h2>
+        <p>输入规格和执行路径稳定时，计划复用宿主调度结构与工作区。每次调用重新绑定输入和参数，新的求导图仍然在本次调用中建立。不同规格或路径对应新的计划。</p>
+        <p>运行时缓冲由实际持有者决定生命周期；长期保存输出会增加存活存储。计划不是通用 JIT，也不会把任意 C++ 控制流自动转换成图。多输出、激活重算与函数式组合见<a href="../execution.md">执行手册</a>。</p>
+      </article>
+
+      <article class="lesson" id="extensions" data-title="C 接口与扩展" data-description="选择 C17、外部 VJP、DLPack 或 OpenVINO 推理扩展。">
+        <div class="eyebrow">09 / 09 <span>EXTENDING CTORCH</span></div>
+        <h1>在清楚的边界上扩展。</h1>
+        <p class="lead">使用 C17 嵌入应用，为外部运算定义反向，或把推理交给独立设备后端。扩展复用核心语义，也保留各自的边界。</p>
+        <div class="lesson-meta"><span>约 6 分钟</span><span>下一步学习路径</span></div>
+        <h2 id="extensions-c">C17：相同引擎，显式拥有权</h2>
+        <p><code>&lt;dl/c_api.h&gt;</code> 提供 opaque handle 和状态码。创建和运算返回拥有型句柄，调用方通过对应的 release 结束生命周期；错误信息由 <code>dl_last_error()</code> 提供。</p>
+        <div class="link-cards"><a href="../../examples/c_train.c"><strong>C17 完整训练 <span>↗</span></strong><p>创建张量、训练 MLP、保存参数与释放句柄。</p></a><a href="../../examples/c_custom_vjp.c"><strong>C17 自定义 VJP <span>↗</span></strong><p>将外部前向和梯度回调接入自动求导。</p></a></div>
+        <h2 id="extensions-external">外部计算与张量交换</h2>
+        <table><thead><tr><th>目标</th><th>入口</th><th>负责的内容</th></tr></thead><tbody><tr><td>组合已有算子</td><td>普通函数 / Module</td><td>由已有算子自动连接梯度。</td></tr><tr><td>外部数值计算</td><td><code>custom_vjp</code></td><td>提供前向及输入梯度公式。</td></tr><tr><td>共享张量存储</td><td>DLPack 扩展</td><td>转交存储拥有权与设备 stream 依赖；求导由应用连接。</td></tr><tr><td>Intel NPU 推理</td><td>OpenVINO 扩展</td><td>编译静态 ONNX / IR，管理推理请求与宿主输入输出。</td></tr></tbody></table>
+        <h2 id="extensions-npu">独立的 NPU 推理路径</h2>
+        <pre data-language="C++"><code>#include &lt;dl/npu.h&gt;
+
+dl::npu::CompiledModel model("model.onnx", {
+    .performance = dl::npu::Performance::latency,
+    .input_shapes = {{1, 3, 224, 224}}
+});
+auto request = model.create_request();
+request.set_input(0, image);
+request.infer();
+auto prediction = request.output();</code></pre>
+        <p>启用 <code>CTORCH_USE_NPU</code> 后，应用链接 <code>ctorch::npu</code>。输入需要符合模型端口及预处理要求。此实验性扩展提供推理，不参与 CPU/CUDA 自动求导，也不把 <code>.ct</code> 权重自动导出成 ONNX。</p>
+        <h2 id="extensions-next">继续动手</h2>
+        <div class="link-cards"><a href="../extensions.md"><strong>扩展手册 <span>↗</span></strong><p>了解 VJP、DLPack 拥有权与 CUDA 交接。</p></a><a href="../npu.md"><strong>NPU 手册 <span>↗</span></strong><p>了解异步请求、缓冲复用与 OpenVINO 依赖。</p></a></div>
+        <p>仓库里的 <a href="../../tests/README.md">tests/</a> 提供独立的核心验证入口，默认不参与库构建。学习时可以从一个小算子或一个新层开始，把数值语义和接口保持清楚。</p>
+      </article>
+
+      <div class="lesson-completion"><button id="complete" class="button" aria-pressed="false">标记本节已完成</button><span id="completion-note">按自己的节奏继续。</span></div>
+      <nav class="lesson-pagination" aria-label="前后课程"><a id="previous" href="#quickstart"><small>上一节</small><strong>快速开始</strong></a><a id="next" href="#tensors"><small>下一节 <span>→</span></small><strong>张量与存储</strong></a></nav>
+      <footer class="article-footer"><span>Ctorch · 从基础开始</span><a href="README.md">关于教程与参考</a><button id="print" class="text-button">打印本节</button></footer>
+    </main>
+    <aside class="toc" aria-label="本页目录"><div class="toc-title">本页内容</div><nav id="page-toc"></nav><a class="toc-source" href="https://github.com/CSZSmaf/Ctorch/tree/main/docs/tutorial">查看教程源文件 ↗</a><div class="toc-tip"><span>边读，边试。</span><p>拖动滑块、点击步骤，让公式变得具体。</p></div></aside>
+  </div>
+  <dialog id="search-dialog" aria-labelledby="search-title">
+    <div class="search-top"><label id="search-title" for="search-input">搜索教程</label><button class="icon-button" id="search-close" aria-label="关闭搜索">×</button></div>
+    <input id="search-input" type="search" placeholder="试试：梯度、快照、NPU…" autocomplete="off">
+    <div id="search-results" aria-live="polite"></div><div class="search-footer">搜索课程正文与代码 <kbd>Esc 关闭</kbd></div>
+  </dialog>
+  <div id="toast" class="toast" role="status" hidden></div>
+  <noscript><div class="noscript">所有课程内容均可阅读。启用 JavaScript 后可以使用交互演示、搜索和学习进度。</div></noscript>
+</body>
+</html>

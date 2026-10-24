@@ -10,6 +10,8 @@
 #include <limits>
 
 namespace dl {
+
+bool GradScaler::unscale_(optim::Optimizer& optimizer) const { return unscale(optimizer); }
 namespace {
 
 bool unscale_values(std::span<const Tensor> gradients, double inverse_scale) {

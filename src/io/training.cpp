@@ -3,6 +3,7 @@
 #include "core/tensor_impl.h"
 #include "io/archive.h"
 #include "io/training_archive.h"
+#include "nn/state_names.h"
 
 #include <algorithm>
 #include <fstream>
@@ -150,8 +151,7 @@ TrainingCheckpoint capture_checkpoint(const nn::Module& model, const optim::Opti
     TrainingProgress progress, const data::DataLoader* loader, std::span<const NamedGenerator> generators,
     std::span<const NamedScheduler> schedulers, const GradScaler* scaler) {
     TrainingCheckpoint result;
-    result.model = model.state_dict();
-    for (auto& [name, tensor] : result.model) tensor = archive::copy_tensor(tensor, Device::cpu());
+    result.model = clone_state(model.state_dict());
     result.modes = model.training_modes();
     result.gradient_modes = model.gradient_modes();
     result.optimizer_parameters = parameter_names(model, optimizer);
@@ -167,7 +167,8 @@ TrainingProgress restore_checkpoint(const TrainingCheckpoint& checkpoint, nn::Mo
     model.load_training_modes(checkpoint.modes);
     if (checkpoint.gradient_modes) model.load_gradient_modes(*checkpoint.gradient_modes);
     const auto names = parameter_names(model, optimizer);
-    optimizer.load_state_dict(archive::reorder_optimizer(checkpoint.optimizer, checkpoint.optimizer_parameters, names));
+    const auto source_names = nn::state_detail::canonical_names(checkpoint.optimizer_parameters, model.state_aliases());
+    optimizer.load_state_dict(archive::reorder_optimizer(checkpoint.optimizer, source_names, names));
     for (const auto& parameter : model.parameters()) parameter.zero_grad();
     restore_runtime(checkpoint, loader, generators, schedulers, scaler);
     return checkpoint.progress;
@@ -207,6 +208,9 @@ FunctionalTrainingState restore_checkpoint(const TrainingCheckpoint& checkpoint,
     std::unordered_map<std::string_view, bool> gradients, modes;
     for (const auto& [name, enabled] : checkpoint.gradient_modes.value()) gradients.emplace(name, enabled);
     for (const auto& [name, enabled] : checkpoint.modes) modes.emplace(name, enabled);
+    const auto aliases = functional.state_aliases();
+    nn::state_detail::add_aliases(values, aliases);
+    nn::state_detail::add_aliases(gradients, aliases);
 
     // 名称决定状态对应关系，新叶的身份独立于原 Module，也独立于 CPU 快照。
     for (const auto& name : functional.parameter_names()) {
@@ -218,8 +222,9 @@ FunctionalTrainingState restore_checkpoint(const TrainingCheckpoint& checkpoint,
         result.state.buffers.push_back(archive::copy_tensor(*values.at(name), device));
     }
     for (const auto& name : functional.module_names()) result.state.training.push_back(modes.at(name));
+    const auto source_names = nn::state_detail::canonical_names(checkpoint.optimizer_parameters, aliases);
     result.optimizer = archive::copy_optimizer(archive::reorder_optimizer(checkpoint.optimizer,
-        checkpoint.optimizer_parameters, functional.parameter_names()), device);
+        source_names, functional.parameter_names()), device);
     restore_runtime(checkpoint, loader, generators, {}, scaler);
     return result;
 }

@@ -35,6 +35,7 @@ public:
     std::span<const std::string> parameter_names() const;
     std::span<const std::string> buffer_names() const;
     std::span<const std::string> module_names() const;
+    std::span<const NameAlias> state_aliases() const;
 
     /// 从原模块当前数值建立独立状态，参数成为同求导开关的新叶，buffer 脱离求导历史。
     FunctionalState state() const;

@@ -4,12 +4,18 @@
 #include "dl/random.h"
 
 #include <string>
+#include <string_view>
 #include <utility>
 
 namespace dl {
 
 using NamedTensor = std::pair<std::string, Tensor>;
 using StateDict = std::vector<NamedTensor>;
+using NameAlias = std::pair<std::string, std::string>;
+
+/// 创建独立、无求导历史的状态快照，保留名称、dtype 与数值。
+/// 同设备复制存储，跨设备传输形成副本；默认保存在 CPU。
+DL_API StateDict clone_state(std::span<const NamedTensor> state, Device device = Device::cpu());
 
 namespace nn {
 
@@ -18,7 +24,8 @@ class FunctionalModule;
 using TrainingModes = std::vector<std::pair<std::string, bool>>;
 using GradientModes = std::vector<std::pair<std::string, bool>>;
 
-/// 模块登记参数、buffer 与子模块，遍历结果保持名称顺序并按张量身份去重。
+/// 模块登记参数、buffer 与子模块，遍历结果按张量身份去重。
+/// 共享张量采用全部登记路径中字典序最小的规范名，槽顺序保留首次遇到的身份顺序。
 class DL_API Module {
 public:
     virtual ~Module() = default;
@@ -32,6 +39,8 @@ public:
     std::vector<Tensor> trainable_parameters() const;
     StateDict named_trainable_parameters() const;
     StateDict named_buffers() const;
+    /// 同一张量的其他登记路径及其规范名，用于状态兼容与共享关系展示。
+    std::vector<NameAlias> state_aliases() const;
 
     /// 在完整前向图之间递归冻结或解冻参数，按身份去重；train/eval 和 buffer 保持原样。
     void requires_grad_(bool enabled = true);
@@ -69,6 +78,7 @@ protected:
     Tensor apply_dropout(const Tensor& input, double probability) const;
 
     /// 参数为存储可写的浮点叶张量，登记后保留传入身份及当前求导状态。
+    /// 本层参数、buffer 和子模块共用名称空间；名称非空、不含点且唯一。
     Tensor register_parameter(std::string name, Tensor value);
     Tensor register_buffer(std::string name, Tensor value);
     /// 子模块可以在外部构造后登记；父模块持有它的共享所有权。
@@ -82,7 +92,8 @@ protected:
     }
 
 private:
-    StateDict collect(bool buffers) const;
+    StateDict collect(bool buffers, bool unique = true) const;
+    void validate_name(std::string_view name) const;
 
     StateDict parameters_;
     StateDict buffers_;

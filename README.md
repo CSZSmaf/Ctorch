@@ -2,6 +2,8 @@
 
 Ctorch 是面向 CPU 与单卡 CUDA 的轻量深度学习框架，以 C++20 和 C17 实现。模型使用普通 C++ 函数组织，张量、一阶自动求导、模块和优化器共享同一套计算语义。
 
+从[交互教程](docs/tutorial/README.md)开始：在浏览器中观察张量布局、梯度与训练过程，再运行对应的 C++ 示例。下载仓库后，直接打开 `docs/tutorial/index.html` 即可离线阅读。
+
 ## 特性
 
 - 动态形状、共享存储视图、广播、索引和一阶反向自动求导。
@@ -40,11 +42,24 @@ auto gradient = *x.grad();
 
 | 主题 | 内容 |
 | --- | --- |
+| [交互教程](docs/tutorial/README.md) | 九节课程、七个交互实验与可编译示例 |
 | [架构](docs/architecture.md) | 张量、求导、数值层与后端职责 |
 | [张量与梯度](docs/tensors.md) | 类型、布局、别名、算子和梯度生命周期 |
 | [训练](docs/training.md) | 模块、优化器、数据、精度和保存恢复 |
 | [组合与执行](docs/execution.md) | 函数式状态、随机 key、执行计划与重算 |
 | [扩展](docs/extensions.md) | C17、自定义 VJP 与 DLPack |
 | [NPU 推理](docs/npu.md) | 可选 OpenVINO 请求与输出复用 |
+
+## 独立验证
+
+小型正确性检查位于 `tests/`，默认不参与库构建，也不随库安装。构建产物位于源码目录外：
+
+```sh
+cmake --preset cpu -DCTORCH_BUILD_TESTS=ON
+cmake --build --preset cpu
+ctest --test-dir ../Ctorch-build/cpu --output-on-failure
+```
+
+覆盖范围与外部验证入口见[测试说明](tests/README.md)。Linux 与 Windows 的 CPU 工作流复用这套入口。
 
 框架面向单机稠密训练。一阶求导、显式设备与精度选择构成基础接口；分布式训练、高阶求导、稀疏训练和通用 JIT 不在当前接口范围内。

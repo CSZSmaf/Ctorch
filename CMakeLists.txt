@@ -27,6 +27,7 @@ add_library(ctorch
     src/core/amp.cpp
     src/core/tensor.cpp
     src/core/spec.cpp
+    src/core/inspect.cpp
     src/core/factory.cpp
     src/core/random.cpp
     src/autograd/engine.cpp
@@ -235,7 +236,11 @@ endif()
 
 if(CTORCH_BUILD_TESTS)
     enable_testing()
-    add_subdirectory("${CTORCH_DEVELOPMENT_DIR}/tests" tests)
+    if(CTORCH_DEVELOPMENT_DIR)
+        add_subdirectory("${CTORCH_DEVELOPMENT_DIR}/tests" tests)
+    else()
+        add_subdirectory(tests)
+    endif()
 endif()
 
 if(CTORCH_BUILD_EXAMPLES)

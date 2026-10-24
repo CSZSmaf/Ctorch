@@ -2,7 +2,10 @@
 
 #include "core/tensor_impl.h"
 #include "ops/numeric.h"
+#include "nn/state_names.h"
 
+#include <algorithm>
+#include <stdexcept>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
@@ -19,29 +22,45 @@ std::vector<Tensor> values(StateDict state) {
 
 } // namespace
 
+void Module::validate_name(std::string_view name) const {
+    const auto contains = [&](const auto& entries) {
+        return std::any_of(entries.begin(), entries.end(), [&](const auto& entry) { return entry.first == name; });
+    };
+    if (name.empty() || name.find('.') != name.npos) {
+        throw std::invalid_argument("module names must be nonempty path segments: " + std::string(name));
+    }
+    if (contains(parameters_) || contains(buffers_) || contains(children_)) {
+        throw std::invalid_argument("module name is already registered: " + std::string(name));
+    }
+}
+
 Tensor Module::register_parameter(std::string name, Tensor value) {
+    validate_name(name);
     parameters_.emplace_back(std::move(name), value);
     return value;
 }
 
 Tensor Module::register_buffer(std::string name, Tensor value) {
+    validate_name(name);
     buffers_.emplace_back(std::move(name), value);
     return value;
 }
 
 void Module::register_module(std::string name, std::shared_ptr<Module> child) {
+    validate_name(name);
     children_.emplace_back(std::move(name), std::move(child));
 }
 
-StateDict Module::collect(bool buffers) const {
+StateDict Module::collect(bool buffers, bool unique) const {
     StateDict result;
-    std::unordered_set<const void*> seen;
+    std::unordered_map<const void*, std::size_t> slots;
     auto visit = [&](auto&& self, const Module& module, const std::string& prefix) -> void {
         const auto& local = buffers ? module.buffers_ : module.parameters_;
         for (const auto& [name, tensor] : local) {
-            if (seen.insert(detail::TensorAccess::identity(tensor)).second) {
-                result.emplace_back(prefix + name, tensor);
-            }
+            auto path = prefix + name;
+            const auto [slot, inserted] = slots.emplace(dl::detail::TensorAccess::identity(tensor), result.size());
+            if (!unique || inserted) result.emplace_back(std::move(path), tensor);
+            else result[slot->second].first = std::min(result[slot->second].first, path);
         }
         for (const auto& [name, child] : module.children_) {
             self(self, *child, prefix + name + ".");
@@ -53,6 +72,19 @@ StateDict Module::collect(bool buffers) const {
 
 StateDict Module::named_parameters() const { return collect(false); }
 StateDict Module::named_buffers() const { return collect(true); }
+
+std::vector<NameAlias> Module::state_aliases() const {
+    std::vector<NameAlias> result;
+    for (bool buffers : {false, true}) {
+        std::unordered_map<const void*, std::string> names;
+        for (const auto& [name, value] : collect(buffers)) names.emplace(dl::detail::TensorAccess::identity(value), name);
+        for (const auto& [name, value] : collect(buffers, false)) {
+            const auto& canonical = names.at(dl::detail::TensorAccess::identity(value));
+            if (name != canonical) result.emplace_back(name, canonical);
+        }
+    }
+    return result;
+}
 
 std::vector<Tensor> Module::parameters() const { return values(named_parameters()); }
 std::vector<Tensor> Module::trainable_parameters() const { return values(named_trainable_parameters()); }
@@ -76,6 +108,8 @@ GradientModes Module::gradient_modes() const {
 void Module::load_gradient_modes(std::span<const std::pair<std::string, bool>> modes) {
     std::unordered_map<std::string_view, bool> source;
     for (const auto& [name, enabled] : modes) source.emplace(name, enabled);
+    const auto aliases = state_aliases();
+    state_detail::add_aliases(source, aliases);
     for (const auto& [name, tensor] : named_parameters()) tensor.requires_grad_(source.at(name));
 }
 
@@ -95,6 +129,8 @@ void Module::load_state_dict(std::span<const NamedTensor> state) {
     for (const auto& [name, tensor] : state) {
         source.emplace(name, &tensor);
     }
+    const auto aliases = state_aliases();
+    state_detail::add_aliases(source, aliases);
     auto destination = state_dict();
     std::unordered_set<const detail::Storage*> target_storage;
     for (const auto& [name, tensor] : destination) {
@@ -163,3 +199,17 @@ void Module::to(Device device) {
 }
 
 } // namespace dl::nn
+
+namespace dl {
+
+StateDict clone_state(std::span<const NamedTensor> state, Device device) {
+    StateDict result;
+    result.reserve(state.size());
+    for (const auto& [name, tensor] : state) {
+        auto value = tensor.detach();
+        result.emplace_back(name, value.device() == device ? value.clone() : value.to(device));
+    }
+    return result;
+}
+
+} // namespace dl

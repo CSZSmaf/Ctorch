@@ -6,6 +6,10 @@
 
 常用层包括 Linear、Conv1d/2d、固定与自适应池化、Upsample、BatchNorm、GroupNorm、LayerNorm、RMSNorm、Embedding、Dropout、RNN/GRU/LSTM、MultiHeadAttention 和 TransformerEncoder。自定义模块通过普通 C++ 运算组合已有层，见 [custom_layer.cpp](../examples/custom_layer.cpp)。
 
+带参数的层在构造时使用 `register_parameter` 登记，在前向中通过 `bound(parameter)` 读取当前绑定；buffer 对应 `register_buffer` 和 `bound_buffer`。这样同一个前向既能使用模块自身状态，也能使用 `FunctionalModule` 提供的独立状态。完整模板见 [parameter_layer.cpp](../examples/parameter_layer.cpp)。
+
+参数、buffer 与子模块共用本层名称空间，名称非空、不含点且唯一。`dl::summary(model)` 展示模块路径、参数量、冻结状态和共享关系；`dl::describe(tensor)` 展示布局与设备等元信息，不读取设备数值。
+
 在构造优化器前迁移模型，使参数与优化器状态具有一致设备。
 
 ## 更新与控制
@@ -28,12 +32,18 @@ DataLoader 管理采样排列、游标和批次整理函数。预取器采用有
 
 裁剪安排在梯度还原之后。恢复训练时同时恢复精度配置、缩放器和更新计数，使微批窗口与参数更新保持对应关系。
 
+`scaler.step(optimizer)` 组合梯度还原、条件更新和倍率调整。需要裁剪时，调用一次 `scaler.unscale_(optimizer)`，按其有限性返回值裁剪并执行 `optimizer.step()`，最后调用 `scaler.update(finite)`。此时更新流程已经显式完成。
+
 cuDNN 低精度卷积先按选定的 16 位格式写回，再展开为 FP32。融合注意力与组合注意力的计算次序和低精度舍入不同，不能假定逐位一致。注意力后端通过选项显式选择，默认使用组合实现。
 
 ## 保存与恢复
 
 轻量权重文件保存参数和 buffer。训练快照另保存优化器槽、参数分组、调度器、随机流、数据排列与游标、精度及缩放状态；预取快照还保存已整理但未消费的批次。
 
-快照按规范参数名称恢复状态，支持模型参数的登记次序变化。保存和恢复安排在更新边界；微批窗口内的中间反向图不写入文件。
+`state_dict()` 返回共享当前存储的状态表。需要保留最佳模型的内存快照时，使用 `dl::clone_state(model.state_dict())` 创建独立、无求导历史的 CPU 副本；第二个参数可指定其他保存设备。训练快照接口本身也采集独立副本。
+
+共享张量采用全部登记路径中字典序最小的规范名，参数槽仍保留首次遇到该身份的顺序。快照按名称恢复模型与优化器状态，支持名称集合相同、登记次序不同的模块树；旧检查点中仍存在于当前树的共享别名也可加载。`state_aliases()` 提供别名到规范名的对应。路径改名由应用明确迁移。
+
+保存和恢复安排在更新边界；微批窗口内的中间反向图不写入文件。
 
 真实训练示例共用训练、验证、最佳模型选择和恢复逻辑，命令见[示例说明](../examples/README.md)。

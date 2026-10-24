@@ -22,6 +22,7 @@ namespace functional_detail {
 struct FunctionalLayout {
     std::vector<Tensor> parameters, buffers;
     std::vector<std::string> parameter_names, buffer_names, module_names;
+    std::vector<NameAlias> aliases;
     std::vector<const Module*> modules;
     std::unordered_map<const void*, std::size_t> parameter_slots, buffer_slots;
     std::unordered_map<const Module*, std::size_t> module_slots;
@@ -70,6 +71,7 @@ ModuleBinding binding_for(const Module* module) {
 
 FunctionalModule::FunctionalModule(Module& module) {
     auto layout = std::make_shared<functional_detail::FunctionalLayout>();
+    layout->aliases = module.state_aliases();
     auto collect = [](StateDict entries, auto& values, auto& names, auto& slots) {
         for (auto& [name, tensor] : entries) {
             slots.emplace(dl::detail::TensorAccess::identity(tensor), values.size());
@@ -95,6 +97,7 @@ FunctionalModule::FunctionalModule(Module& module) {
 std::span<const std::string> FunctionalModule::parameter_names() const { return layout_->parameter_names; }
 std::span<const std::string> FunctionalModule::buffer_names() const { return layout_->buffer_names; }
 std::span<const std::string> FunctionalModule::module_names() const { return layout_->module_names; }
+std::span<const NameAlias> FunctionalModule::state_aliases() const { return layout_->aliases; }
 
 FunctionalState FunctionalModule::state() const {
     FunctionalState result;

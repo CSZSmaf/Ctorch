@@ -58,6 +58,8 @@ public:
     /// CPU 梯度可为 f32/f64，CUDA 为 f32；CUDA 每个设备只回传一个合并标志。
     /// 需要裁剪时，在本调用之后执行，再按返回值决定是否调用 optimizer.step。
     bool unscale(optim::Optimizer& optimizer) const;
+    /// 显式表示原地还原优化器梯度，与 unscale(optimizer) 使用相同操作。
+    bool unscale_(optim::Optimizer& optimizer) const;
     /// 独立返回还原后的梯度与合并有限标志，空项和重复身份对应关系保持原样。
     /// 每个有值身份复制为连续、无求导历史的存储，原梯度只读，状态倍率保持不变。
     UnscaledGradients unscale(std::span<const std::optional<Tensor>> gradients) const;

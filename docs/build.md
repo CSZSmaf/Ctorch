@@ -24,6 +24,7 @@ cmake --build --preset shared
 | CTORCH_USE_DLPACK | 官方 DLPack 1.x 头文件 |
 | CTORCH_USE_NPU | OpenVINO 2026.0+ Runtime，构建独立推理扩展 |
 | CTORCH_BUILD_EXAMPLES | 构建 C/C++ 接口与训练示例 |
+| CTORCH_BUILD_TESTS | 构建独立的核心正确性检查，使用 CTest 运行 |
 
 这些选项默认关闭。CUDA 构建使用 `cuda` 或 `cudnn` 预设，GPU 架构通过 `CMAKE_CUDA_ARCHITECTURES` 指定。
 
@@ -68,3 +69,9 @@ cmake --build ../Ctorch-build/installed-examples
 ```
 
 可选 NPU 目标为 `ctorch::npu`，通过 `find_package(Ctorch CONFIG REQUIRED COMPONENTS npu)` 请求。其他安装目标继续使用 `ctorch::ctorch`。
+
+## 测试与外部开发目录
+
+`CTORCH_BUILD_TESTS=ON` 默认加入仓库中的 `tests/`，无需额外依赖。测试程序和安装消费工程都在构建目录生成，运行方式见[测试说明](../tests/README.md)。
+
+`CTORCH_DEVELOPMENT_DIR` 可指定独立的开发目录；设置后，其 `tests/` 替代内置核心测试。`CTORCH_BUILD_BENCHMARKS` 使用该目录的 `benchmarks/`，用于单独维护的数据、硬件和性能实验。这些内容不进入库的安装目标。

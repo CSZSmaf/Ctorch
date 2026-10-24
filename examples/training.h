@@ -195,11 +195,7 @@ struct TrainingState {
         if (loss >= best_loss) return;
         best_loss = loss;
         best_step = step;
-        best_model = model.state_dict();
-        for (auto& [name, tensor] : best_model) {
-            auto value = tensor.detach();
-            tensor = value.device() == dl::Device::cpu() ? value.clone() : value.to(dl::Device::cpu());
-        }
+        best_model = dl::clone_state(model.state_dict());
     }
 
     dl::StateDict extra() const {

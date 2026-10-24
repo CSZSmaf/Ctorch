@@ -31,6 +31,8 @@ MNIST 目录包含标准解压文件名，像素缩放到 `[0,1]`。训练集前
 
 | 文件 | 主题 |
 | --- | --- |
+| [first_training.cpp](first_training.cpp) | 从零初值学习线性回归，对应交互教程 |
+| [parameter_layer.cpp](parameter_layer.cpp) | 带参数的自定义层、普通与函数式绑定 |
 | [custom_layer.cpp](custom_layer.cpp) / [c_train.c](c_train.c) | C++ 自定义层与 C17 训练 |
 | [finetune.cpp](finetune.cpp) / [recurrent_train.cpp](recurrent_train.cpp) | 分阶段微调与 GRU 训练 |
 | [gradients.cpp](gradients.cpp) / [c_gradient_processing.c](c_gradient_processing.c) | 显式梯度、范数与裁剪 |

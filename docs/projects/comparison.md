@@ -60,14 +60,14 @@ BatchNorm 使用保存的均值和方差，dropout 关闭。梯度仍然计算�
 | LeNet | TensorFlow | 4.77e-6 | 1.16e-10 | 2.46e-7 | 1.49e-8 |
 | ResNet-20 | PyTorch | 1.91e-6 | 8.94e-8 | 1.31e-6 | 5.96e-8 |
 | ResNet-20 | TensorFlow | 2.38e-6 | 4.47e-8 | 1.13e-6 | 2.98e-8 |
-| Transformer | PyTorch | 8.58e-6 | 4.77e-7 | 3.54e-7 | 1.19e-7 |
-| Transformer | TensorFlow | 8.11e-6 | 3.58e-7 | 3.35e-7 | 2.98e-8 |
+| Transformer | PyTorch | 7.87e-6 | 0 | 3.69e-7 | 1.19e-7 |
+| Transformer | TensorFlow | 8.58e-6 | 1.19e-7 | 3.50e-7 | 2.98e-8 |
 
 所有张量都通过 `atol=2e-4, rtol=2e-4` 的逐元素比较。公式为：
 
 <span data-tex="|a-b|\le 2\times10^{-4}+2\times10^{-4}|b|">绝对差 ≤ 2e-4 + 2e-4 × 参考值绝对值</span>
 
-这些误差说明上述输入上的前向、反向和一次参数更新接近。完整训练结果在前一节单独比较。
+前一节比较 MNIST 的完整训练结果，后面还列出了 Transformer 的连续参数更新结果。
 
 ## CPU 前向耗时
 
@@ -75,20 +75,38 @@ BatchNorm 使用保存的均值和方差，dropout 关闭。梯度仍然计算�
 
 测量使用上节的批量和模型，在一次 SGD 更新后计时。先预热 3 次，再运行 7 组、每组 5 次前向，取每组平均耗时的中位数。计时包含模型调用，不包含读取文件、载入权重、初始布局转换、反向传播或参数更新。
 
+Transformer 的 Ctorch 耗时取三轮独立测量的中位数。
+
 | 模型 | Ctorch 普通分配 / ms | Ctorch 缓冲复用 / ms | PyTorch / ms | TensorFlow / ms |
 | --- | ---: | ---: | ---: | ---: |
 | MLP，批量 32 | 0.064 | 0.064 | 0.059 | 0.234 |
 | LeNet，批量 16 | 0.797 | 0.342 | 0.523 | 0.736 |
 | ResNet-20，批量 4 | 11.920 | 4.615 | 3.998 | 9.429 |
-| Transformer，批量 2、长度 128 | 11.246 | 8.475 | 5.688 | 13.812 |
+| Transformer，批量 2、长度 128 | 11.149 | 8.166 | 5.734 | 13.713 |
 
 “缓冲复用”在计算外使用 `dl::MemoryGuard`，重复调用可以借用此前释放的存储。两种 Ctorch 配置使用相同内核、权重和输入，输出、梯度和 SGD 更新逐元素相同。写法和内存生命周期见[性能与内存](../performance.md)。
 
-在这个配置下，启用缓冲复用的 Ctorch LeNet 前向耗时低于 PyTorch，ResNet-20 约为 PyTorch 的 1.15 倍，Transformer 约为 1.49 倍。批量、布局、设备和计算后端都会影响耗时。
+在这个配置下，启用缓冲复用的 Ctorch LeNet 前向耗时低于 PyTorch，ResNet-20 约为 PyTorch 的 1.15 倍，Transformer 约为 1.42 倍。批量、布局、设备和计算后端都会影响耗时。
 
 PyTorch 和 TensorFlow 均直接使用 eager 算子，没有开启 `torch.compile` 或 `tf.function`。PyTorch 的 Python 环境为 3.14，TensorFlow 为 3.12。Ctorch/PyTorch 的图像布局是 NCHW，TensorFlow 使用 NHWC，布局转换在比较程序载入数据时完成。三个 Transformer 都使用普通矩阵运算实现因果注意力。
 
 三框架的这张表统一使用 CPU。TensorFlow 2.20 的原生 Windows 包不提供 CUDA GPU 支持；运行其 GPU 版本可以按[官方安装说明](https://www.tensorflow.org/install/pip)使用 WSL2 或 Linux。
+
+## Transformer 连续参数更新
+
+使用同一组 Transformer 权重和同一批文本输入，三个框架连续进行 24 次 SGD 更新，学习率为 0.001。Dropout 关闭，前向、反向和参数更新均正常执行。每一步比较交叉熵，最后比较全部可训练参数。
+
+每个训练步包含清空梯度、前向、交叉熵、反向和 SGD 更新。前 3 步预热，随后 21 步按每组 3 步计算平均耗时，再取 7 组的中位数。硬件、精度和线程数与前向比较相同，Ctorch 启用 `MemoryGuard`。
+
+| 框架 | 每步耗时 / ms | 24 步交叉熵最大误差 | 最终参数最大误差 |
+| --- | ---: | ---: | ---: |
+| Ctorch | 20.956 | — | — |
+| PyTorch | 18.308 | 8.34e-7 | 1.19e-7 |
+| TensorFlow | 59.611 | 7.16e-7 | 1.19e-7 |
+
+误差以 Ctorch 为参照。这个配置下，Ctorch 的训练步耗时约为 PyTorch 的 1.14 倍。
+
+启用训练模式并将 Dropout 设为 0.1 时，Ctorch 的完整训练步耗时为 29.930 ms。Dropout 会增加掩码生成、输入缩放和反向梯度缩放的计算。
 
 ## 复现比较
 

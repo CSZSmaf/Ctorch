@@ -57,6 +57,14 @@ int main() {
 
 ReLU 等简单操作使用具有具体类型的 lambda。编译器能够看到操作体，更容易将它内联到数据循环中。模板本身不会在每个元素上执行额外的运行时分派。
 
+### 减少 Transformer 中重复的逐元素计算
+
+Dropout 先生成布尔掩码，再根据掩码保留并缩放输入。数据指针在进入循环前取得，前向和反向共用已有的二元遍历函数。连续输入走固定步长路径，转置和切片沿各自的步长访问。
+
+因果注意力通常用负无穷屏蔽每行末尾的未来位置。Softmax 可以直接将这些位置写为零，只对前面的有效范围计算指数和归一化。LogSoftmax 对应的位置写为负无穷。整行都为负无穷时，结果为 NaN。
+
+GELU 使用误差函数 `std::erf`。公式中的固定系数用 `constexpr` 表示，循环通过乘法计算缩放后的输入和高斯密度。改写除法会产生小幅浮点舍入差异，因此比较时需要同时检查前向、梯度和连续更新后的参数。
+
 ### 按行处理卷积和池化
 
 卷积展开窗口时，同一行共用输入起点和有效列范围。连续部分使用 `std::copy_n`，带步长的视图则沿固定步长访问。池化按平面、行、列遍历，减少从线性下标反复解算空间坐标的整数除法。
@@ -82,3 +90,5 @@ Ctorch 保留独立输出与原地更新的接口区别。原地累计可以读�
 [框架结果对比](projects/comparison.md#cpu-前向耗时)同时列出普通分配、启用缓冲复用、PyTorch 和 TensorFlow 的结果。[比较程序](../examples/comparison/README.md)提供复现命令。缓冲复用效果取决于模型的临时张量数量、大小和系统分配器。
 
 相关实现方式可参考 [PyTorch 的 CPU 逐元素循环](https://github.com/pytorch/pytorch/blob/main/aten/src/ATen/native/cpu/Loops.h)和 [Eigen 的表达式求值与临时结果](https://libeigen.gitlab.io/eigen/docs-nightly/TopicLazyEvaluation.html)。
+
+GELU 的实现还可参考 [PyTorch CPU 激活函数](https://github.com/pytorch/pytorch/blob/main/aten/src/ATen/native/cpu/Activation.cpp)。

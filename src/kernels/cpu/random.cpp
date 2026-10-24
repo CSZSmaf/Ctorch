@@ -1,9 +1,9 @@
 #include "kernels/cpu/ops.h"
 
 #include "core/dispatch.h"
-#include "core/iteration.h"
 #include "core/philox.h"
 #include "dl/random.h"
+#include "kernels/cpu/elementwise.h"
 
 #include <algorithm>
 #include <cmath>
@@ -33,12 +33,10 @@ TensorData random(Shape shape, numeric::Random operation, double first, double s
 
 TensorData masked_scale(const TensorData& input, const TensorData& mask, double factor) {
     auto result = empty_data(input.layout.sizes, input.dtype);
-    IterationPlan<2> plan(input.layout.sizes, {input.layout.strides, mask.layout.strides});
     visit_floating(input.dtype, [&]<class T> {
         const auto scale = static_cast<T>(factor);
-        plan.for_each([&](Index index, const auto& offsets) {
-            result.mutable_data<T>()[index] = mask.data<bool>()[offsets[1]]
-                ? input.data<T>()[offsets[0]] * scale : T{0};
+        cpu::binary<T, bool>(input, mask, result, [scale](T value, bool keep) {
+            return keep ? value * scale : T{0};
         });
     });
     return result;
@@ -58,8 +56,9 @@ TensorData random_keyed(Shape shape, numeric::Random operation, double first, do
     using namespace random_bits;
     if (operation == numeric::Random::bernoulli) {
         const auto threshold = static_cast<std::uint64_t>(first * 0x1p53);
+        auto* output = result.mutable_data<bool>();
         for (Index index = 0; index < count; ++index) {
-            result.mutable_data<bool>()[index] = selected(philox(key.seed, index, key.stream), threshold);
+            output[index] = selected(philox(key.seed, index, key.stream), threshold);
         }
     } else {
         visit_floating(options.dtype, [&]<class T> {

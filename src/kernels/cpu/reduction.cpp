@@ -117,8 +117,14 @@ template <bool Logarithmic> TensorData softmax_forward(const TensorData& input, 
                 const A value = static_cast<A>(source[source_base + item * step]);
                 maximum = std::isnan(value) ? value : std::max(maximum, value);
             }
+            // 因果注意力的尾部掩码直接写入零概率；非有限行继续按完整宽度计算。
+            Index active = width;
+            if (std::isfinite(maximum)) {
+                while (active > 0 && static_cast<A>(source[source_base + (active - 1) * step])
+                    == -std::numeric_limits<A>::infinity()) --active;
+            }
             A total = 0;
-            for (Index item = 0; item < width; ++item) {
+            for (Index item = 0; item < active; ++item) {
                 const auto position = base + item * inner;
                 const A shifted = static_cast<A>(source[source_base + item * step]) - maximum;
                 const A exponential = std::exp(shifted);
@@ -129,11 +135,13 @@ template <bool Logarithmic> TensorData softmax_forward(const TensorData& input, 
             // 对数概率直接由平移值减去 log(sum(exp))，微小概率无需先存为零再取对数。
             A log_total = 0;
             if constexpr (Logarithmic) log_total = std::log(total);
-            for (Index item = 0; item < width; ++item) {
+            for (Index item = 0; item < active; ++item) {
                 auto& value = target[base + item * inner];
                 if constexpr (Logarithmic) value -= log_total;
                 else value /= total;
             }
+            for (Index item = active; item < width; ++item)
+                target[base + item * inner] = Logarithmic ? -std::numeric_limits<A>::infinity() : A{0};
         }
     });
     return result;

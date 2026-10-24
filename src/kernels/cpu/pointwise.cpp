@@ -12,6 +12,10 @@
 namespace dl::detail::cpu {
 namespace {
 
+// 高斯函数的固定系数在编译期求值，逐元素循环使用乘法。
+template <class T> constexpr T inverse_sqrt2 = std::numbers::sqrt2_v<T> / T{2};
+template <class T> constexpr T inverse_sqrt2pi = std::numbers::inv_sqrtpi_v<T> * inverse_sqrt2<T>;
+
 template <class Function>
 TensorData binary(const TensorData& a, const TensorData& b, Function function) {
     auto result = empty_data(broadcast_shape(a.layout.sizes, b.layout.sizes), a.dtype);
@@ -50,7 +54,7 @@ template <class T, class Apply> void dispatch_unary(Unary operation, Apply apply
     case Unary::gelu: break;
     }
     apply([](T value) {
-        return T{0.5} * value * (T{1} + std::erf(value / std::numbers::sqrt2_v<T>));
+        return T{0.5} * value * (T{1} + std::erf(value * inverse_sqrt2<T>));
     });
 }
 
@@ -85,9 +89,8 @@ template <class T, class Apply> void dispatch_backward(Unary operation, Apply ap
     case Unary::gelu: break;
     }
     apply([](T grad, T value) {
-        const T cdf = T{0.5} * (T{1} + std::erf(value / std::numbers::sqrt2_v<T>));
-        const T density = std::exp(-T{0.5} * value * value)
-            / std::sqrt(T{2} * std::numbers::pi_v<T>);
+        const T cdf = T{0.5} * (T{1} + std::erf(value * inverse_sqrt2<T>));
+        const T density = std::exp(-T{0.5} * value * value) * inverse_sqrt2pi<T>;
         return grad * (cdf + value * density);
     });
 }

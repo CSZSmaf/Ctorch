@@ -15,7 +15,7 @@ jobs:
             shared: 'ON'
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Configure
         run: cmake -S . -B ../Ctorch-build -DCTORCH_BUILD_TESTS=ON -DCTORCH_BUILD_EXAMPLES=ON -DCMAKE_BUILD_TYPE=${{ matrix.config }} -DBUILD_SHARED_LIBS=${{ matrix.shared }}
       - name: Build

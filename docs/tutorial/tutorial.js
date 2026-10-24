@@ -349,6 +349,25 @@ byId("train-reset").onclick = () => {
 byId("learning-rate").oninput = () => { byId("learning-rate-value").textContent = Number(byId("learning-rate").value).toFixed(2); };
 renderTraining();
 
+// 二分类 softmax 使用最大分数平移，交叉熵直接由 logits 计算。
+function renderClassification() {
+  const score = Number(byId("logit-score").value);
+  const target = Number(byId("classification-target").value);
+  const maximum = Math.max(0, score);
+  const denominator = Math.exp(-maximum) + Math.exp(score - maximum);
+  const probabilities = [Math.exp(-maximum), Math.exp(score - maximum)].map(value => value / denominator);
+  byId("logit-value").textContent = score.toFixed(1);
+  ["zero", "one"].forEach((name, index) => {
+    byId(`probability-${name}`).value = probabilities[index];
+    byId(`probability-${name}-value`).textContent = probabilities[index].toFixed(4);
+  });
+  byId("classification-prediction").textContent = score > 0 ? "1" : "0";
+  byId("classification-loss").textContent = (Math.log(denominator) + maximum - target * score).toFixed(4);
+}
+byId("logit-score").oninput = renderClassification;
+byId("classification-target").onchange = renderClassification;
+renderClassification();
+
 document.querySelectorAll("[data-binding]").forEach(button => {
   button.onclick = () => {
     const external = button.dataset.binding === "functional";

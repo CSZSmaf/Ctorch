@@ -99,4 +99,14 @@ int main(int argc, char** argv) {
     const auto metrics = evaluate(*restored, validation);
     std::cout << "restored step " << progress.step << ", loss " << metrics.loss
               << ", accuracy " << metrics.accuracy << '\n';
+
+    // 单个样本保留批次维度；softmax 只用于把分类分数转换为概率。
+    restored->eval();
+    dl::NoGradGuard no_grad;
+    const float point[] = {0.7f, 0.4f};
+    auto input = dl::from_span<float>(point, {1, 2});
+    auto logits = (*restored)(input);
+    auto probabilities = dl::softmax(logits, 1).to_vector<float>();
+    std::cout << "prediction " << dl::argmax(logits, 1).item<dl::Index>()
+              << ", class 1 probability " << probabilities[1] << '\n';
 }

@@ -155,6 +155,17 @@ TensorData matmul(const TensorData& a, const TensorData& b) {
 void matmul_into(TensorData& target, const TensorData& a, const TensorData& b, bool accumulate) {
     backend(a.device()).matmul_into(target, a, b, accumulate);
 }
+TensorData linear(const TensorData& input, const TensorData& weight,
+                  const std::optional<TensorData>& bias, Shape output_shape) {
+    auto result = empty_data(std::move(output_shape), accumulation_dtype(input.dtype), input.device());
+    const auto offset = bias ? std::optional{cast(*bias, result.dtype)} : std::nullopt;
+    const auto fused = backend(input.device()).linear_into;
+    if (offset && fused && fused(result, input, weight, *offset)) return result;
+    auto matrix = reshape(result, {input.layout.sizes[0], weight.layout.sizes[0]});
+    matmul_into(matrix, input, transpose(weight, 0, 1), false);
+    if (offset) add_into(result, expand(*offset, result.layout.sizes));
+    return result;
+}
 TensorData softmax(const TensorData& input, Index axis, bool logarithmic) {
     return backend(input.device()).softmax(input, axis, logarithmic);
 }

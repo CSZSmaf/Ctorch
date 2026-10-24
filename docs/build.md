@@ -26,7 +26,7 @@ cmake --build --preset shared
 | CTORCH_BUILD_EXAMPLES | 构建 C/C++ 接口与训练示例 |
 | CTORCH_BUILD_TESTS | 构建独立的核心正确性检查，使用 CTest 运行 |
 
-这些选项默认关闭。CUDA 构建使用 `cuda` 或 `cudnn` 预设，GPU 架构通过 `CMAKE_CUDA_ARCHITECTURES` 指定。
+这些选项默认关闭。CUDA 构建使用 `cuda` 或 `cudnn` 预设，GPU 架构通过 `CMAKE_CUDA_ARCHITECTURES` 指定。cuBLAS 和 cuBLASLt 均由 CUDA Toolkit 提供。
 
 ```sh
 cmake --preset cuda

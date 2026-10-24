@@ -1,8 +1,20 @@
 # 性能与内存
 
-模型的耗时包括矩阵计算、张量寻址、数据复制和内存分配。CUDA 后端使用 cuBLAS、cuDNN 和通用 CUDA 内核，CPU 后端使用类型化循环和 BLAS。
+模型的耗时包括矩阵计算、张量寻址、数据复制和内存分配。CUDA 后端使用 cuBLAS、cuBLASLt、cuDNN 和通用 CUDA 内核，CPU 后端使用类型化循环和 BLAS。
 
 ## CUDA 计算与显存复用
+
+### 合并 Linear 的矩阵乘和偏置
+
+Linear 计算 <span data-tex="Y = XW^{\mathsf T} + b">Y = X Wᵀ + b</span>。如果先计算矩阵乘，再逐元素加偏置，就需要额外提交一次 CUDA 内核，并重新读取和写入输出矩阵。
+
+对连续且地址满足 16 字节对齐的输入、权重和向量偏置，Ctorch 使用一次 cuBLASLt 调用完成这两个操作。它将行主序缓冲视为列主序矩阵，直接计算 <span data-tex="Y^{\mathsf T} = WX^{\mathsf T} + b">Yᵀ = W Xᵀ + b</span>。偏置的列间距设为零，使同一向量用于所有样本。输入、权重和输出都无需为此转置或复制。
+
+同一设备上，相同形状和精度复用已有的矩阵描述和计算方案。首次使用时查询方案，命中缓存的调用只提交数据地址和工作区。缓存最多保存 64 个方案，工作区按所选算法的实际需求分配，上限为 32 MiB，并在训练步之间复用。
+
+这条路径支持 FP32、FP16 和 BF16 输入，低精度乘法使用 FP32 累积和输出。无偏置时直接计算矩阵乘；其他偏置广播形式或特殊布局使用原有矩阵乘和加法。反向传播继续将输入梯度和权重梯度直接写入各自的累计目标，偏置梯度沿样本维求和。
+
+算法与布局的说明见 [cuBLASLt 文档](https://docs.nvidia.com/cuda/cublas/index.html#using-the-cublaslt-api)。cuBLASLt 随 CUDA Toolkit 提供，普通 `dl::linear` 和 `dl::nn::Linear` 调用会自动使用适用的实现。
 
 ### 让相邻线程读取相邻元素
 
@@ -25,7 +37,7 @@ Ctorch 让相邻线程分别负责相邻列，每个线程先累计 64 行，再
 
 CUDA 张量默认使用专用的异步内存池。张量释放后，空闲空间留在池中供后续分配复用。读取损失或等待 GPU 完成时，内存池也继续保留这些空间。普通 CUDA 训练无需额外添加内存作用域。
 
-`dl::cuda::memory_stats()` 的 `used_bytes` 表示仍在使用的分配，`reserved_bytes` 还包含池内的空闲空间。一个训练阶段结束后，可以调用 `dl::cuda::release_unused_memory()` 归还空闲空间。仍被张量持有的存储继续有效。
+`dl::cuda::memory_stats()` 的 `used_bytes` 表示仍在使用的分配，`reserved_bytes` 还包含池内的空闲空间。一个训练阶段结束后，可以调用 `dl::cuda::release_unused_memory()` 释放 cuBLASLt 和 cuDNN 的缓存工作区，并归还池内空闲空间。仍被张量持有的存储继续有效。
 
 ```cpp
 dl::synchronize(dl::Device::cuda());

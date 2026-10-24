@@ -112,6 +112,7 @@ Context::Context(Device device)
     // GEMM 的 alpha/beta 作为宿主值提交，调用结束后局部标量即可离开作用域。
     check(cublasSetPointerMode(blas.get(), CUBLAS_POINTER_MODE_HOST));
     check(cublasSetMathMode(blas.get(), CUBLAS_DEFAULT_MATH));
+    linear = make_linear_context(device, stream.get(), pool.get());
 #ifdef CTORCH_USE_CUDNN
     dnn = make_dnn_context(device, stream.get(), pool.get());
 #endif

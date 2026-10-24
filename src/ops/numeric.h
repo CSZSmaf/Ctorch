@@ -131,6 +131,9 @@ Shape matmul_shape(const TensorData& a, const TensorData& b);
 TensorData matmul(const TensorData& a, const TensorData& b);
 /// 目标连续、与输入存储独立，shape 为完整乘积，dtype 为累积精度。
 void matmul_into(TensorData& target, const TensorData& a, const TensorData& b, bool accumulate);
+/// 输入已合并为二维矩阵，output_shape 恢复前导维并决定偏置的广播形状。
+TensorData linear(const TensorData& input, const TensorData& weight,
+                  const std::optional<TensorData>& bias, Shape output_shape);
 /// 两种概率表示共用稳定的行归约，低精度输入直接读取并以 FP32 计算。
 TensorData softmax(const TensorData& input, Index axis, bool logarithmic = false);
 TensorData softmax_backward(const TensorData& grad, const TensorData& output,

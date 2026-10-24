@@ -53,6 +53,7 @@ void reset_peak_memory_stats(int device) {
 
 void release_unused_memory(int device) {
     with_context(device, [](auto& context) {
+        detail::cuda::release_linear_workspace(*context.linear);
 #ifdef CTORCH_USE_CUDNN
         detail::cuda::release_dnn_workspace(*context.dnn);
 #endif

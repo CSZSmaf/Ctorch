@@ -40,6 +40,7 @@ const Backend& cuda_backend() {
         .amax = cuda::amax,
         .arg_extreme = cuda::arg_extreme,
         .matmul_into = cuda::matmul_into,
+        .linear_into = cuda::linear_into,
         .softmax = cuda::softmax,
         .softmax_backward = cuda::softmax_backward,
         .normalization = cuda::normalization,

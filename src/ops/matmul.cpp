@@ -40,11 +40,8 @@ Tensor linear(const Tensor& input, const Tensor& weight, std::optional<Tensor> b
     auto weights = numeric::cast(detail::data_of(weight), compute_dtype);
     auto output_shape = input.shape();
     output_shape.back() = columns;
-    auto result = numeric::reshape(numeric::matmul(matrix, numeric::transpose(weights, 0, 1)), output_shape);
-    if (bias) {
-        auto offset = numeric::cast(detail::data_of(*bias), result.dtype);
-        numeric::add_into(result, numeric::expand(offset, output_shape));
-    }
+    auto result = numeric::linear(matrix, weights,
+        bias ? std::optional{detail::data_of(*bias)} : std::nullopt, std::move(output_shape));
     std::vector edges{detail::gradient_edge(input), detail::gradient_edge(weight),
         bias ? detail::gradient_edge(*bias) : detail::Edge{}};
     std::optional<detail::SavedTensor> saved_input = edges[1].node ? std::optional{matrix} : std::nullopt;

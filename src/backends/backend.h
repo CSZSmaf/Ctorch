@@ -50,6 +50,8 @@ struct Backend {
     TensorData (*amax)(const TensorData&, const Shape&, KeepDim);
     TensorData (*arg_extreme)(const TensorData&, Index, KeepDim, bool);
     void (*matmul_into)(TensorData&, const TensorData&, const TensorData&, bool);
+    // 可选的矩阵乘加偏置实现；返回 false 时由数值层组合原有操作。
+    bool (*linear_into)(TensorData&, const TensorData&, const TensorData&, const TensorData&) = nullptr;
     TensorData (*softmax)(const TensorData&, Index, bool);
     TensorData (*softmax_backward)(const TensorData&, const TensorData&, Index, bool);
     void (*normalization)(const TensorData&, const std::optional<TensorData>&,

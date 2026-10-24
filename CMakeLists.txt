@@ -166,6 +166,7 @@ if(CTORCH_USE_CUDA)
         src/kernels/cuda/reduction.cu
         src/kernels/cuda/normalization.cu
         src/kernels/cuda/matmul.cpp
+        src/kernels/cuda/linear.cpp
         src/kernels/cuda/indexing.cu
         src/kernels/cuda/loss.cu
         src/kernels/cuda/optimizer.cu
@@ -174,8 +175,8 @@ if(CTORCH_USE_CUDA)
         src/kernels/cuda/resampling.cu
     )
     target_compile_definitions(ctorch PRIVATE CTORCH_USE_CUDA)
-    # 设备上下文与 cuDNN 计划缓存用标准互斥量管理共享状态。
-    target_link_libraries(ctorch PRIVATE CUDA::cudart CUDA::cublas Threads::Threads)
+    # 设备上下文与 cuBLASLt、cuDNN 计算方案使用标准互斥量管理共享状态。
+    target_link_libraries(ctorch PRIVATE CUDA::cudart CUDA::cublas CUDA::cublasLt Threads::Threads)
     if(MSVC)
         target_compile_options(ctorch PRIVATE "$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/utf-8>")
     endif()

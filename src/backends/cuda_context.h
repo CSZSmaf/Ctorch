@@ -53,6 +53,9 @@ using Event = std::unique_ptr<std::remove_pointer_t<cudaEvent_t>, EventDeleter>;
 Event make_event(Device device, bool wait_on_release = true);
 
 struct DnnContext;
+struct LinearContext;
+std::shared_ptr<LinearContext> make_linear_context(Device device, cudaStream_t stream, cudaMemPool_t pool);
+void release_linear_workspace(LinearContext& context);
 
 /// 每设备拥有独立的 Runtime 内存池与计算、复制两个 stream，数值库绑定计算 stream。
 /// Storage 持有上下文；池最后销毁，使工作区和张量的有序归还先结束其宿主生命周期。
@@ -64,6 +67,7 @@ struct Context {
     std::unique_ptr<std::remove_pointer_t<cudaStream_t>, StreamDeleter> copy_stream;
     std::unique_ptr<std::remove_pointer_t<cublasHandle_t>, BlasDeleter> blas;
     std::shared_ptr<DnnContext> dnn;
+    std::shared_ptr<LinearContext> linear;
 };
 
 std::shared_ptr<Context> context(Device device);

@@ -40,6 +40,7 @@ void sum_into(TensorData& target, const TensorData& input, const Shape& axes, bo
 TensorData amax(const TensorData& input, const Shape& axes, KeepDim keep);
 TensorData arg_extreme(const TensorData& input, Index axis, KeepDim keep, bool maximum);
 void matmul_into(TensorData& target, const TensorData& a, const TensorData& b, bool accumulate);
+bool linear_into(TensorData& target, const TensorData& input, const TensorData& weight, const TensorData& bias);
 TensorData softmax(const TensorData& input, Index axis, bool logarithmic = false);
 TensorData softmax_backward(const TensorData& grad, const TensorData& output, Index axis, bool logarithmic);
 void normalization(const TensorData& input, const std::optional<TensorData>& weight,

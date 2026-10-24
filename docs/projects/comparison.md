@@ -77,12 +77,12 @@ BatchNorm 使用保存的均值和方差，dropout 关闭。梯度仍然计算�
 
 | 模型 | Ctorch / ms | PyTorch / ms | TensorFlow / ms |
 | --- | ---: | ---: | ---: |
-| MLP，批量 32 | 0.068 | 0.059 | 0.242 |
-| LeNet，批量 16 | 5.574 | 0.488 | 0.725 |
-| ResNet-20，批量 4 | 86.162 | 3.991 | 9.191 |
-| Transformer，批量 2、长度 128 | 27.081 | 5.634 | 13.553 |
+| MLP，批量 32 | 0.068 | 0.059 | 0.232 |
+| LeNet，批量 16 | 1.144 | 0.548 | 0.732 |
+| ResNet-20，批量 4 | 14.634 | 3.886 | 8.988 |
+| Transformer，批量 2、长度 128 | 13.561 | 5.669 | 13.584 |
 
-此配置下，Ctorch 的 MLP 前向耗时接近 PyTorch，卷积网络和 Transformer 仍有明显差距。表中是单线程 CPU、这些输入形状下的测量；更换批量、设备或计算后端后应重新计时。
+在这个配置下，Ctorch 的 MLP 前向耗时接近 PyTorch，Transformer 接近 TensorFlow。卷积模型与 PyTorch 仍有明显差距。批量、布局、设备和计算后端都会影响耗时。
 
 PyTorch 和 TensorFlow 均直接使用 eager 算子，没有开启 `torch.compile` 或 `tf.function`。PyTorch 的 Python 环境为 3.14，TensorFlow 为 3.12。Ctorch/PyTorch 的图像布局是 NCHW，TensorFlow 使用 NHWC，布局转换在比较程序载入数据时完成。三个 Transformer 都使用普通矩阵运算实现因果注意力。
 

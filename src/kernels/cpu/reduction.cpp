@@ -95,17 +95,20 @@ template <bool Logarithmic> TensorData softmax_forward(const TensorData& input, 
         using A = FloatAccumulator<T>;
         const auto* source = input.data<T>();
         auto* target = result.mutable_data<A>();
+        // 一行只解析一次起始地址，归约轴内沿固定步长访问连续或带步长的输入。
+        const auto step = input.layout.strides[axis];
         for (Index row = 0; row < rows; ++row) {
             const auto base = (row / inner) * width * inner + row % inner;
+            const auto source_base = input.layout.index_offset(base);
             A maximum = -std::numeric_limits<A>::infinity();
             for (Index item = 0; item < width; ++item) {
-                const A value = static_cast<A>(source[input.layout.index_offset(base + item * inner)]);
+                const A value = static_cast<A>(source[source_base + item * step]);
                 maximum = std::isnan(value) ? value : std::max(maximum, value);
             }
             A total = 0;
             for (Index item = 0; item < width; ++item) {
                 const auto position = base + item * inner;
-                const A shifted = static_cast<A>(source[input.layout.index_offset(position)]) - maximum;
+                const A shifted = static_cast<A>(source[source_base + item * step]) - maximum;
                 const A exponential = std::exp(shifted);
                 if constexpr (Logarithmic) target[position] = shifted;
                 else target[position] = exponential;
@@ -134,19 +137,20 @@ TensorData softmax_gradient(const TensorData& grad, const TensorData& output, In
         const auto* upstream = grad.data<T>();
         const auto* saved = output.data<T>();
         auto* target = result.mutable_data<T>();
+        const auto grad_step = grad.layout.strides[axis], output_step = output.layout.strides[axis];
         for (Index row = 0; row < rows; ++row) {
             const auto base = (row / inner) * width * inner + row % inner;
+            const auto grad_base = grad.layout.index_offset(base), output_base = output.layout.index_offset(base);
             T total = 0;
             for (Index item = 0; item < width; ++item) {
-                const auto index = base + item * inner;
-                const T value = upstream[grad.layout.index_offset(index)];
+                const T value = upstream[grad_base + item * grad_step];
                 if constexpr (Logarithmic) total += value;
-                else total += value * saved[output.layout.index_offset(index)];
+                else total += value * saved[output_base + item * output_step];
             }
             for (Index item = 0; item < width; ++item) {
                 const auto index = base + item * inner;
-                const T value = upstream[grad.layout.index_offset(index)];
-                const T probability = saved[output.layout.index_offset(index)];
+                const T value = upstream[grad_base + item * grad_step];
+                const T probability = saved[output_base + item * output_step];
                 if constexpr (Logarithmic) target[index] = value - std::exp(probability) * total;
                 else target[index] = probability * (value - total);
             }

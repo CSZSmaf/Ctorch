@@ -15,27 +15,50 @@ Index pixel_offset(const Layout& layout, const SpatialGeometry& geometry, Index 
         + y * layout.strides[2] + x * layout.strides[3];
 }
 
+// 每行窗口共享输入行和有效列区间，内层只沿列步长前进。
+template <class Function>
+void column_rows(const SpatialGeometry& g, Function function) {
+    if (g.output_width == 0) return;
+    Index offset = 0;
+    for (Index plane = 0; plane < g.batch * g.channels; ++plane) {
+        for (Index ky = 0; ky < g.kernel_height; ++ky) {
+            for (Index kx = 0; kx < g.kernel_width; ++kx) {
+                const auto x = kx * g.dilation_width - g.padding_width;
+                const auto first = std::clamp((g.stride_width - 1 - x) / g.stride_width,
+                                              Index{0}, g.output_width);
+                const auto last = std::clamp((g.width + g.stride_width - 1 - x) / g.stride_width,
+                                             first, g.output_width);
+                auto y = ky * g.dilation_height - g.padding_height;
+                for (Index row = 0; row < g.output_height; ++row, y += g.stride_height) {
+                    function(plane, y, x, first, last, offset);
+                    offset += g.output_width;
+                }
+            }
+        }
+    }
+}
+
 } // namespace
 
 TensorData im2col(const TensorData& input, Size2 kernel, const Conv2dOptions& options) {
     const auto g = spatial_geometry(input.layout.sizes, kernel, options.stride, options.padding, options.dilation);
     auto result = empty_data(column_shape(g, options.groups), input.dtype);
-    const auto positions = g.output_height * g.output_width;
-    const auto count = result.layout.numel();
     visit_storage(input.dtype, [&]<class T> {
         const auto* source = input.data<T>();
         auto* target = result.mutable_data<T>();
-        for (Index index = 0; index < count; ++index) {
-            const auto row = index / positions;
-            const auto column = index % positions;
-            const auto x = (column % g.output_width) * g.stride_width - g.padding_width
-                + (row % g.kernel_width) * g.dilation_width;
-            const auto y = (column / g.output_width) * g.stride_height - g.padding_height
-                + ((row / g.kernel_width) % g.kernel_height) * g.dilation_height;
-            const auto plane = row / (g.kernel_height * g.kernel_width);
-            target[index] = y >= 0 && y < g.height && x >= 0 && x < g.width
-                ? source[pixel_offset(input.layout, g, plane, y, x)] : T{0};
-        }
+        const auto step = g.stride_width * input.layout.strides[3];
+        column_rows(g, [&](Index plane, Index y, Index x, Index first, Index last, Index offset) {
+            auto* row = target + offset;
+            if (y < 0 || y >= g.height) {
+                std::fill_n(row, g.output_width, T{0});
+                return;
+            }
+            std::fill_n(row, first, T{0});
+            auto position = pixel_offset(input.layout, g, plane, y, x + first * g.stride_width);
+            for (Index column = first; column < last; ++column, position += step)
+                row[column] = source[position];
+            std::fill(row + last, row + g.output_width, T{0});
+        });
     });
     return result;
 }
@@ -43,24 +66,18 @@ TensorData im2col(const TensorData& input, Size2 kernel, const Conv2dOptions& op
 void col2im_into(TensorData& result, const TensorData& columns, Size2 kernel,
                  const Conv2dOptions& options, bool accumulate) {
     const auto g = spatial_geometry(result.layout.sizes, kernel, options.stride, options.padding, options.dilation);
-    const auto positions = g.output_height * g.output_width;
-    const auto count = columns.layout.numel();
     visit_floating(columns.dtype, [&]<class T> {
         const auto* source = columns.data<T>();
         auto* target = result.mutable_data<T>();
         if (!accumulate) std::fill_n(target, result.layout.numel(), T{0});
-        for (Index index = 0; index < count; ++index) {
-            const auto row = index / positions;
-            const auto column = index % positions;
-            const auto x = (column % g.output_width) * g.stride_width - g.padding_width
-                + (row % g.kernel_width) * g.dilation_width;
-            const auto y = (column / g.output_width) * g.stride_height - g.padding_height
-                + ((row / g.kernel_width) % g.kernel_height) * g.dilation_height;
-            if (y >= 0 && y < g.height && x >= 0 && x < g.width) {
-                const auto plane = row / (g.kernel_height * g.kernel_width);
-                target[(plane * g.height + y) * g.width + x] += source[columns.layout.index_offset(index)];
-            }
-        }
+        const auto step = columns.layout.strides.back();
+        column_rows(g, [&](Index plane, Index y, Index x, Index first, Index last, Index offset) {
+            if (y < 0 || y >= g.height || first == last) return;
+            auto position = columns.layout.index_offset(offset + first);
+            auto pixel = (plane * g.height + y) * g.width + x + first * g.stride_width;
+            for (Index column = first; column < last; ++column, position += step, pixel += g.stride_width)
+                target[pixel] += source[position];
+        });
     });
 }
 

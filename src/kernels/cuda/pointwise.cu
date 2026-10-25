@@ -28,6 +28,55 @@ __global__ void copy_kernel(const From* input, To* output, Index count, IndexMap
     }
 }
 
+/// 分块转置使相邻线程连续读写，类型转换在写入时完成。
+template <class From, class To>
+__global__ void transpose_copy_kernel(const From* input, To* output, Index rows, Index columns,
+                                      Index row_tiles, Index column_tiles, Index tiles) {
+    __shared__ From tile[32][33];
+    const auto tiles_per_matrix = row_tiles * column_tiles;
+    for (Index index = blockIdx.x; index < tiles; index += gridDim.x) {
+        const auto batch = index / tiles_per_matrix;
+        const auto row = (index % tiles_per_matrix / column_tiles) * 32;
+        const auto column = (index % column_tiles) * 32;
+        const auto base = batch * rows * columns;
+        for (int offset = 0; offset < 32; offset += 8) {
+            if (row + threadIdx.x < rows && column + threadIdx.y + offset < columns)
+                tile[threadIdx.y + offset][threadIdx.x] =
+                    input[base + (column + threadIdx.y + offset) * rows + row + threadIdx.x];
+        }
+        __syncthreads();
+        for (int offset = 0; offset < 32; offset += 8) {
+            if (row + threadIdx.y + offset < rows && column + threadIdx.x < columns)
+                output[base + (row + threadIdx.y + offset) * columns + column + threadIdx.x] =
+                    storage_cast<To>(tile[threadIdx.x][threadIdx.y + offset]);
+        }
+        __syncthreads();
+    }
+}
+
+template <class From, class To>
+void copy_elements(const TensorData& input, TensorData& output, cudaStream_t stream) {
+    const IndexMap source(input.layout);
+    const auto count = input.layout.numel();
+    // 合并连续轴后，矩阵转置和 NCHW/NHWC 转换都可表示为一批二维转置。
+    if ((source.rank == 2 || source.rank == 3) && output.layout.is_contiguous()) {
+        const auto rows = source.sizes[source.rank - 2];
+        const auto columns = source.sizes[source.rank - 1];
+        if (rows >= 32 && columns >= 32 && source.strides[source.rank - 2] == 1
+            && source.strides[source.rank - 1] == rows
+            && (source.rank == 2 || source.strides[0] == rows * columns)) {
+            const auto row_tiles = (rows + 31) / 32;
+            const auto column_tiles = (columns + 31) / 32;
+            const auto tiles = (count / (rows * columns)) * row_tiles * column_tiles;
+            transpose_copy_kernel<<<static_cast<int>(std::min(tiles, Index{4096})), dim3(32, 8), 0, stream>>>(
+                input.data<From>(), output.mutable_data<To>(), rows, columns, row_tiles, column_tiles, tiles);
+            return;
+        }
+    }
+    copy_kernel<<<grid_size(count), block_size, 0, stream>>>(input.data<From>(), output.mutable_data<To>(),
+        count, source, IndexMap(output.layout));
+}
+
 template <bool Accumulate = false, class T, class Function>
 __global__ void unary_kernel(const T* input, float* output, Index count, IndexMap layout,
                               Function function) {
@@ -220,9 +269,7 @@ void copy_into(TensorData& target, const TensorData& source) {
                                cudaMemcpyDeviceToDevice, execution.stream()));
     } else {
         cuda::visit_storage(source.dtype, [&]<class T> {
-            copy_kernel<<<grid_size(count), block_size, 0, execution.stream()>>>(
-                source.data<T>(), target.mutable_data<T>(), count,
-                IndexMap(source.layout), IndexMap(target.layout));
+            copy_elements<T, T>(source, target, execution.stream());
         });
         check(cudaGetLastError());
     }
@@ -239,9 +286,7 @@ TensorData cast(const TensorData& input, DType dtype) {
         Execution execution(input);
         cuda::visit_storage(input.dtype, [&]<class From> {
             cuda::visit_storage(dtype, [&]<class To> {
-                copy_kernel<<<grid_size(count), block_size, 0, execution.stream()>>>(
-                    input.data<From>(), result.mutable_data<To>(), count,
-                    IndexMap(input.layout), IndexMap(result.layout));
+                copy_elements<From, To>(input, result, execution.stream());
             });
         });
         check(cudaGetLastError());

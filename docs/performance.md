@@ -12,6 +12,16 @@
 
 两种整数宽度共用一个 C++ 模板。卷积偏置广播、逐元素计算、归约和带步长的优化器更新共用这条寻址路径。相关实现可参阅 [PyTorch 的 CUDA 张量索引](https://github.com/pytorch/pytorch/blob/main/aten/src/ATen/cuda/detail/TensorInfo.cuh)。
 
+### 转置时同时转换精度
+
+低精度 cuDNN 卷积使用通道连续的 NHWC 存储。张量的逻辑形状为 NCHW，进入卷积和返回 FP32 结果时需要调整存储顺序。
+
+合并连续轴后，NCHW 与 NHWC 之间的转换可以表示为一批二维矩阵的转置。CUDA 复制内核按 32×32 的块读取数据，在共享内存中交换行列，再按目标类型写出。读取和写入都让相邻线程访问相邻位置，类型转换与转置共用一次读写。每行共享内存多留一个元素，使转置读取分散到不同的存储单元，减少访问冲突。
+
+普通矩阵转置、批量转置和这类通道布局转换使用同一个 C++ 模板。FP16、BF16、FP32 等存储类型在编译期选择，逐元素转换使用统一的舍入规则。较窄的矩阵、切片和其他带步长的布局使用通用索引路径。
+
+复制、`clone()` 和 `astype()` 自动选择对应路径。低精度计算的输出、主参数、梯度和优化器状态使用 FP32。分块转置的访存方式可参考 [NVIDIA CUDA 最佳实践](https://docs.nvidia.com/cuda/cuda-c-best-practices-guide/index.html#shared-memory-in-matrix-multiplication-c-aat)。
+
 ### 归约中的线程协作
 
 求和、Softmax、归一化和交叉熵都需要合并多个线程的计算结果。CUDA 的一个线程束包含 32 个线程。Ctorch 将各线程的局部值写入共享内存，再由一个线程束按固定树形顺序合并。跨线程束的部分在寄存器中计算，最后 32 个值通过 shuffle 指令合并。
@@ -110,7 +120,7 @@ CUDA 算子异步提交。宿主计时需要在测量边界等待 GPU 完成；C
 
 MLP、卷积网络和单层编码器的完整 CUDA 训练步耗时见[框架结果对比](projects/comparison.md#cuda-训练步耗时)。
 
-定位瓶颈时，可以使用 [CUPTI Activity API](https://docs.nvidia.com/cupti/main/main.html) 统计预热后的内核执行时间。下面三种训练结构来自同一组 CUDA 测量，比例按各模型全部计算内核的执行时间计算。
+定位瓶颈时，可以使用 [CUPTI Activity API](https://docs.nvidia.com/cupti/main/main.html) 统计预热后的内核执行时间。下面三种训练结构使用 FP32，来自同一组 CUDA 测量，比例按各模型全部计算内核的执行时间计算。
 
 | 训练结构 | 主要耗时 |
 | --- | --- |

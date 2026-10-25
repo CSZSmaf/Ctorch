@@ -6,6 +6,7 @@
 #include <math_constants.h>
 
 #include <algorithm>
+#include <limits>
 
 namespace dl::detail::cuda {
 
@@ -35,12 +36,15 @@ __device__ int segment_index(const Batch& batch, int block) {
 /// 至多 16 维的非负步长同时表示连续数据、转置、切片与广播。
 struct IndexMap {
     int rank = 0;
+    bool narrow = true;
     Index sizes[max_rank]{};
     Index strides[max_rank]{};
 
     IndexMap() = default;
     IndexMap(const Shape& shape, const Shape& steps) {
+        Index count = 1;
         for (std::size_t axis = 0; axis < shape.size(); ++axis) {
+            count *= shape[axis];
             if (shape[axis] == 1) {
                 continue;
             }
@@ -52,6 +56,7 @@ struct IndexMap {
                 strides[rank++] = steps[axis];
             }
         }
+        narrow = count <= std::numeric_limits<std::uint32_t>::max();
     }
     explicit IndexMap(const Layout& layout) : IndexMap(layout.sizes, layout.strides) {}
 
@@ -59,12 +64,20 @@ struct IndexMap {
         if (rank == 1) {
             return linear * strides[0];
         }
+        return narrow ? offset_from(static_cast<std::uint32_t>(linear)) : offset_from(linear);
+    }
+
+    // 坐标除法按逻辑元素数选择整数宽度，存储偏移始终使用 64 位。
+    template <class Coordinate>
+    __device__ Index offset_from(Coordinate linear) const {
         Index result = 0;
-        for (int axis = rank - 1; axis >= 0; --axis) {
-            result += (linear % sizes[axis]) * strides[axis];
-            linear /= sizes[axis];
+        for (int axis = rank - 1; axis > 0; --axis) {
+            const auto size = static_cast<Coordinate>(sizes[axis]);
+            result += (linear % size) * strides[axis];
+            linear /= size;
         }
-        return result;
+        // 剩余下标已位于最外层轴范围内，直接使用其步长。
+        return rank == 0 ? 0 : result + linear * strides[0];
     }
 };
 

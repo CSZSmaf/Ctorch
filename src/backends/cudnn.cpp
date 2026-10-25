@@ -108,8 +108,8 @@ TensorData convolution(ConvolutionPass pass, const TensorData& first, const Tens
     std::unordered_map<int64_t, void*> pointers{
         {1, const_cast<void*>(first.address())}, {2, const_cast<void*>(second.address())}, {3, result.mutable_address()}};
     dnn::check(plan.graph.execute(context.handle.get(), pointers, workspace));
-    // 库卷积以输入精度写回，FP32 计算的结果在库边界舍入，再展开到框架的累计精度。
-    return numeric::cast(result, output_dtype);
+    // 库边界保留输入精度的舍入；前向偏置或梯度接收方再转成累计精度。
+    return result;
 }
 
 namespace {

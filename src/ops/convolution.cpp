@@ -11,15 +11,17 @@ namespace {
 
 namespace numeric = detail::numeric;
 
-/// 两个后端交付独立的 NCHW 结果，通道偏置和对应归约在同一个节点中处理。
+/// 结果转成累计精度时同时处理通道偏置，偏置梯度沿 N/H/W 归约。
 template <class Backward>
 Tensor record_convolution(detail::TensorData result, std::vector<detail::Edge> edges,
                           const std::optional<Tensor>& bias, Backward backward) {
     const auto channels = result.layout.sizes[1];
+    const auto dtype = accumulation_dtype(result.dtype);
     if (bias) {
-        auto offset = numeric::reshape(numeric::cast(detail::data_of(*bias), result.dtype), {1, channels, 1, 1});
-        numeric::add_into(result, numeric::expand(offset, result.layout.sizes));
-    }
+        auto offset = numeric::reshape(numeric::cast(detail::data_of(*bias), dtype), {1, channels, 1, 1});
+        if (result.dtype != dtype) result = numeric::cast_add(result, offset);
+        else numeric::add_into(result, numeric::expand(offset, result.layout.sizes));
+    } else result = numeric::cast(result, dtype);
     return detail::record(std::move(result), std::move(edges),
         [backward = std::move(backward), channels](const auto& grad, auto& sink, const auto& inputs) {
             if (sink.needs(inputs[0]) || sink.needs(inputs[1])) backward(grad, sink, inputs);

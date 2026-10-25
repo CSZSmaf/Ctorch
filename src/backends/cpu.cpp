@@ -31,6 +31,7 @@ const Backend& cpu_backend() {
         .full = cpu::full,
         .clone = cpu::clone,
         .cast = cpu::cast,
+        .cast_add = cpu::cast_add,
         .copy_into = cpu::copy_into,
         .axpy = cpu::axpy,
         .unary = cpu::unary,

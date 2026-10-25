@@ -5,6 +5,8 @@
 #include "kernels/cuda/common.cuh"
 #include "kernels/cuda/storage.cuh"
 
+#include <cstdint>
+
 namespace dl::detail::cuda {
 namespace {
 
@@ -20,18 +22,76 @@ template <class T> __global__ void fill_kernel(T* output, Index count, T value) 
     }
 }
 
-template <class From, class To>
-__global__ void copy_kernel(const From* input, To* output, Index count, IndexMap source, IndexMap target) {
+struct CopyValue {
+    template <class T> __device__ T operator()(T value, Index) const { return value; }
+};
+
+struct AddOffset {
+    const float* values;
+    IndexMap layout;
+    __device__ float operator()(float value, Index index) const {
+        return __fadd_rn(value, values[layout.offset(index)]);
+    }
+};
+
+template <class From, class To, class Transform>
+__global__ void copy_kernel(const From* input, To* output, Index count, IndexMap source, IndexMap target,
+                            Transform transform) {
     for (Index index = static_cast<Index>(blockIdx.x) * blockDim.x + threadIdx.x;
          index < count; index += static_cast<Index>(blockDim.x) * gridDim.x) {
-        output[target.offset(index)] = storage_cast<To>(input[source.offset(index)]);
+        output[target.offset(index)] = transform(storage_cast<To>(input[source.offset(index)]), index);
     }
 }
 
+template <class T> struct alignas(4 * sizeof(T)) CopyPack { T values[4]; };
+
+/// 连续数据按四个元素读写，类型转换仍逐项采用相同的舍入规则。
+template <class From, class To, class Transform>
+__device__ void packed_copy(const From* input, To* output, Index count, int block, int blocks,
+                            Transform transform) {
+    const Index thread = static_cast<Index>(block) * blockDim.x + threadIdx.x;
+    const Index stride = static_cast<Index>(blockDim.x) * blocks;
+    for (Index group = thread; group < count / 4; group += stride) {
+        const auto source = reinterpret_cast<const CopyPack<From>*>(input)[group];
+        CopyPack<To> target;
+#pragma unroll
+        for (int item = 0; item < 4; ++item)
+            target.values[item] = transform(storage_cast<To>(source.values[item]), group * 4 + item);
+        reinterpret_cast<CopyPack<To>*>(output)[group] = target;
+    }
+    const Index tail = count / 4 * 4 + thread;
+    if (tail < count) output[tail] = transform(storage_cast<To>(input[tail]), tail);
+}
+
+template <class From, class To, class Transform>
+__global__ void packed_copy_kernel(const From* input, To* output, Index count, Transform transform) {
+    packed_copy(input, output, count, blockIdx.x, gridDim.x, transform);
+}
+
+struct CastOperand {
+    const float* input;
+    void* output;
+    Index count;
+    int blocks;
+};
+
+/// 两个操作数按各自大小划分线程块，大小不同的矩阵也只提交一次转换。
+template <class To> __global__ void cast_pair_kernel(CastOperand first, CastOperand second) {
+    const bool right = blockIdx.x >= first.blocks;
+    const auto operand = right ? second : first;
+    const int block = static_cast<int>(blockIdx.x) - (right ? first.blocks : 0);
+    packed_copy(operand.input, static_cast<To*>(operand.output), operand.count, block, operand.blocks, CopyValue{});
+}
+
+template <class T> bool packed(const TensorData& value) {
+    return value.layout.is_contiguous()
+        && reinterpret_cast<std::uintptr_t>(value.address()) % alignof(CopyPack<T>) == 0;
+}
+
 /// 分块转置使相邻线程连续读写，类型转换在写入时完成。
-template <class From, class To>
+template <class From, class To, class Transform>
 __global__ void transpose_copy_kernel(const From* input, To* output, Index rows, Index columns,
-                                      Index row_tiles, Index column_tiles, Index tiles) {
+                                      Index row_tiles, Index column_tiles, Index tiles, Transform transform) {
     __shared__ From tile[32][33];
     const auto tiles_per_matrix = row_tiles * column_tiles;
     for (Index index = blockIdx.x; index < tiles; index += gridDim.x) {
@@ -46,18 +106,24 @@ __global__ void transpose_copy_kernel(const From* input, To* output, Index rows,
         }
         __syncthreads();
         for (int offset = 0; offset < 32; offset += 8) {
-            if (row + threadIdx.y + offset < rows && column + threadIdx.x < columns)
-                output[base + (row + threadIdx.y + offset) * columns + column + threadIdx.x] =
-                    storage_cast<To>(tile[threadIdx.x][threadIdx.y + offset]);
+            if (row + threadIdx.y + offset < rows && column + threadIdx.x < columns) {
+                const auto index = base + (row + threadIdx.y + offset) * columns + column + threadIdx.x;
+                output[index] = transform(storage_cast<To>(tile[threadIdx.x][threadIdx.y + offset]), index);
+            }
         }
         __syncthreads();
     }
 }
 
-template <class From, class To>
-void copy_elements(const TensorData& input, TensorData& output, cudaStream_t stream) {
+template <class From, class To, class Transform = CopyValue>
+void copy_elements(const TensorData& input, TensorData& output, cudaStream_t stream, Transform transform = {}) {
     const IndexMap source(input.layout);
     const auto count = input.layout.numel();
+    if (packed<From>(input) && packed<To>(output)) {
+        packed_copy_kernel<<<grid_size((count + 3) / 4), block_size, 0, stream>>>(
+            input.data<From>(), output.mutable_data<To>(), count, transform);
+        return;
+    }
     // 合并连续轴后，矩阵转置和 NCHW/NHWC 转换都可表示为一批二维转置。
     if ((source.rank == 2 || source.rank == 3) && output.layout.is_contiguous()) {
         const auto rows = source.sizes[source.rank - 2];
@@ -69,12 +135,12 @@ void copy_elements(const TensorData& input, TensorData& output, cudaStream_t str
             const auto column_tiles = (columns + 31) / 32;
             const auto tiles = (count / (rows * columns)) * row_tiles * column_tiles;
             transpose_copy_kernel<<<static_cast<int>(std::min(tiles, Index{4096})), dim3(32, 8), 0, stream>>>(
-                input.data<From>(), output.mutable_data<To>(), rows, columns, row_tiles, column_tiles, tiles);
+                input.data<From>(), output.mutable_data<To>(), rows, columns, row_tiles, column_tiles, tiles, transform);
             return;
         }
     }
     copy_kernel<<<grid_size(count), block_size, 0, stream>>>(input.data<From>(), output.mutable_data<To>(),
-        count, source, IndexMap(output.layout));
+        count, source, IndexMap(output.layout), transform);
 }
 
 template <bool Accumulate = false, class T, class Function>
@@ -290,6 +356,39 @@ TensorData cast(const TensorData& input, DType dtype) {
             cuda::visit_storage(dtype, [&]<class To> {
                 copy_elements<From, To>(input, result, execution.stream());
             });
+        });
+        check(cudaGetLastError());
+    }
+    return result;
+}
+TensorData cast_add(const TensorData& input, const TensorData& offset) {
+    auto result = empty_data(input.layout.sizes, accumulation_dtype(input.dtype), input.device());
+    if (result.layout.numel() == 0) return result;
+    Execution execution(input);
+    const AddOffset transform{offset.data<float>(),
+        IndexMap(result.layout.sizes, broadcast_strides(offset.layout, result.layout.sizes))};
+    visit_storage(input.dtype, [&]<class T> {
+        copy_elements<T, float>(input, result, execution.stream(), transform);
+    });
+    check(cudaGetLastError());
+    return result;
+}
+std::array<TensorData, 2> cast_pair(const TensorData& first, const TensorData& second, DType dtype) {
+    if (first.dtype != DType::f32 || second.dtype != DType::f32 || !is_low_precision(dtype)
+        || !packed<float>(first) || !packed<float>(second))
+        return {numeric::cast(first, dtype), numeric::cast(second, dtype)};
+    std::array result{empty_data(first.layout.sizes, dtype, first.device()),
+                      empty_data(second.layout.sizes, dtype, second.device())};
+    const auto operand = [](const TensorData& input, TensorData& output) {
+        const auto count = input.layout.numel();
+        return CastOperand{input.data<float>(), output.mutable_address(), count,
+                           count == 0 ? 0 : grid_size((count + 3) / 4)};
+    };
+    const auto left = operand(first, result[0]), right = operand(second, result[1]);
+    if (left.blocks + right.blocks != 0) {
+        Execution execution(first);
+        visit_storage(dtype, [&]<class T> {
+            cast_pair_kernel<T><<<left.blocks + right.blocks, block_size, 0, execution.stream()>>>(left, right);
         });
         check(cudaGetLastError());
     }

@@ -22,6 +22,8 @@ const Backend& cuda_backend() {
         .full = cuda::full,
         .clone = cuda::clone,
         .cast = cuda::cast,
+        .cast_add = cuda::cast_add,
+        .cast_pair = cuda::cast_pair,
         .copy_into = cuda::copy_into,
         .axpy = cuda::axpy,
         .unary = cuda::unary,

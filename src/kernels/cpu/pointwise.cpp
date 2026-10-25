@@ -195,6 +195,16 @@ void unary_backward_into(TensorData& result, const TensorData& grad, const Tenso
 TensorData add(const TensorData& a, const TensorData& b) {
     return binary(a, b, [](auto x, auto y) { return x + y; });
 }
+TensorData cast_add(const TensorData& input, const TensorData& offset) {
+    auto result = empty_data(input.layout.sizes, accumulation_dtype(input.dtype));
+    visit_storage(input.dtype, [&]<class T> {
+        using A = FloatAccumulator<T>;
+        cpu::binary<T, A, A>(input, offset, result, [](T value, A bias) {
+            return static_cast<A>(value) + bias;
+        });
+    });
+    return result;
+}
 TensorData add_relu(const TensorData& a, const TensorData& b) {
     auto result = empty_data(broadcast_shape(a.layout.sizes, b.layout.sizes), accumulation_dtype(a.dtype));
     visit_storage(a.dtype, [&]<class T> {

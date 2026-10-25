@@ -13,7 +13,7 @@ std::shared_ptr<DnnContext> make_dnn_context(Device device, cudaStream_t stream,
 void release_dnn_workspace(DnnContext& context);
 /// 按目标精度一次完成转换和打包，返回逻辑 NCHW / KCRS 的数据描述。
 TensorData prepare_convolution(const TensorData& input, DType dtype);
-/// 两个输入已按相同精度准备，结果采用 FP32 存储和该精度策略对应的物理布局。
+/// 两个输入已按相同精度准备，结果保留库精度和对应物理布局。
 TensorData convolution(ConvolutionPass pass, const TensorData& first, const TensorData& second,
                        Shape output_shape, const Conv2dOptions& options);
 

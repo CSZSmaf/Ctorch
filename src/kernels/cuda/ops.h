@@ -22,6 +22,8 @@ TensorData masked_scale(const TensorData& input, const TensorData& mask, double 
 TensorData full(Shape shape, double value, DType dtype, Device device);
 TensorData clone(const TensorData& input);
 TensorData cast(const TensorData& input, DType dtype);
+TensorData cast_add(const TensorData& input, const TensorData& offset);
+std::array<TensorData, 2> cast_pair(const TensorData& first, const TensorData& second, DType dtype);
 void copy_into(TensorData& target, const TensorData& source);
 void axpy(TensorData& target, const TensorData& input, double alpha);
 TensorData unary(const TensorData& input, Unary operation);

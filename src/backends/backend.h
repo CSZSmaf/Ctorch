@@ -32,6 +32,8 @@ struct Backend {
     TensorData (*full)(Shape, double, DType, Device);
     TensorData (*clone)(const TensorData&);
     TensorData (*cast)(const TensorData&, DType);
+    TensorData (*cast_add)(const TensorData&, const TensorData&);
+    std::array<TensorData, 2> (*cast_pair)(const TensorData&, const TensorData&, DType);
     void (*copy_into)(TensorData&, const TensorData&);
     void (*axpy)(TensorData&, const TensorData&, double);
     TensorData (*unary)(const TensorData&, numeric::Unary);

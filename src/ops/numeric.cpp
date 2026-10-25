@@ -70,6 +70,14 @@ TensorData clone(const TensorData& input) { return backend(input.device()).clone
 TensorData cast(const TensorData& input, DType dtype) {
     return input.dtype == dtype ? input : backend(input.device()).cast(input, dtype);
 }
+TensorData cast_add(const TensorData& input, const TensorData& offset) {
+    return backend(input.device()).cast_add(input, offset);
+}
+std::array<TensorData, 2> cast_pair(const TensorData& first, const TensorData& second, DType dtype) {
+    if (first.dtype == dtype && second.dtype == dtype) return {first, second};
+    const auto paired = backend(first.device()).cast_pair;
+    return paired ? paired(first, second, dtype) : std::array{cast(first, dtype), cast(second, dtype)};
+}
 
 TensorData to(const TensorData& input, Device device) {
     if (input.device() == device) {

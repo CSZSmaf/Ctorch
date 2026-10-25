@@ -3,6 +3,8 @@
 #include "core/tensor_data.h"
 #include "dl/options.h"
 
+#include <array>
+
 namespace dl { class Generator; struct RandomKey; }
 
 namespace dl::detail::numeric {
@@ -25,6 +27,9 @@ TensorData full(Shape shape, double value, DType dtype, Device device = Device::
 TensorData to(const TensorData& input, Device device);
 TensorData clone(const TensorData& input);
 TensorData cast(const TensorData& input, DType dtype);
+/// 低精度输入转成 FP32 后加上可广播的 FP32 偏置，共用一次结果遍历。
+TensorData cast_add(const TensorData& input, const TensorData& offset);
+std::array<TensorData, 2> cast_pair(const TensorData& first, const TensorData& second, DType dtype);
 void copy_into(TensorData& target, const TensorData& source);
 void add_into(TensorData& target, const TensorData& contribution);
 void axpy(TensorData& target, const TensorData& input, double alpha);

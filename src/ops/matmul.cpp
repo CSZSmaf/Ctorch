@@ -36,8 +36,8 @@ Tensor linear(const Tensor& input, const Tensor& weight, std::optional<Tensor> b
     const auto rows = detail::numel(shape.first(shape.size() - 1));
     const auto columns = weight.size(0);
     // 所有前导维组成同一个行轴，连续输入共享存储，一般布局按 reshape 规则准备。
-    auto matrix = numeric::reshape(numeric::cast(detail::data_of(input), compute_dtype), {rows, shape.back()});
-    auto weights = numeric::cast(detail::data_of(weight), compute_dtype);
+    auto [matrix, weights] = numeric::cast_pair(detail::data_of(input), detail::data_of(weight), compute_dtype);
+    matrix = numeric::reshape(matrix, {rows, shape.back()});
     auto output_shape = input.shape();
     output_shape.back() = columns;
     auto result = numeric::linear(matrix, weights,
@@ -83,8 +83,7 @@ Tensor matmul(const Tensor& a, const Tensor& b) {
     }
 
     const auto compute_dtype = matrix_compute_dtype(a);
-    auto left = detail::numeric::cast(detail::data_of(a), compute_dtype);
-    auto right = detail::numeric::cast(detail::data_of(b), compute_dtype);
+    auto [left, right] = detail::numeric::cast_pair(detail::data_of(a), detail::data_of(b), compute_dtype);
     std::vector edges{detail::gradient_edge(a), detail::gradient_edge(b)};
     std::optional<detail::SavedTensor> saved_a = edges[1].node ? std::optional{left} : std::nullopt;
     std::optional<detail::SavedTensor> saved_b = edges[0].node ? std::optional{right} : std::nullopt;

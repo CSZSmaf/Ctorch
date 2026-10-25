@@ -54,6 +54,8 @@ const Backend& cpu_backend() {
         .softmax_backward = cpu::softmax_backward,
         .normalization = cpu::normalization,
         .normalization_backward = cpu::normalization_backward,
+        .batch_normalization = cpu::batch_normalization,
+        .batch_normalization_backward = cpu::batch_normalization_backward,
         .gather = cpu::gather,
         .repeat = cpu::repeat,
         .repeat_backward_into = cpu::repeat_backward_into,

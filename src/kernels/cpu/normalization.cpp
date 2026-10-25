@@ -79,8 +79,8 @@ void normalization_backward(const TensorData& grad, const TensorData& input,
             auto* dx = result.input ? result.input->mutable_data<A>() : nullptr;
             auto* dw = result.weight ? result.weight->mutable_data<A>() : nullptr;
             auto* db = result.bias ? result.bias->mutable_data<A>() : nullptr;
-            if (dw) std::fill_n(dw, width, A{0});
-            if (db) std::fill_n(db, width, A{0});
+            if (dw && !result.accumulate[1]) std::fill_n(dw, width, A{0});
+            if (db && !result.accumulate[2]) std::fill_n(db, width, A{0});
             const A inverse_width = A{1} / static_cast<A>(width);
 
             for (Index row = 0; row < rows; ++row) {
@@ -106,7 +106,8 @@ void normalization_backward(const TensorData& grad, const TensorData& input,
                     const A dy = upstream[offset(grad.layout, base + col)];
                     if (dx) {
                         const A value = scale ? dy * scale[offset(weight->layout, col)] : dy;
-                        dx[base + col] = (value - average - z * projection) * inverse_std;
+                        const A contribution = (value - average - z * projection) * inverse_std;
+                        dx[base + col] = (result.accumulate[0] ? dx[base + col] : A{0}) + contribution;
                     }
                     if (dw) dw[col] += dy * z;
                     if (db) db[col] += dy;

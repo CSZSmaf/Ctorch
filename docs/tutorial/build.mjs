@@ -24,6 +24,7 @@ const sections = {
     ["docs/projects/transformer.md", "Shakespeare：Transformer"],
     ["docs/projects/comparison.md", "框架结果对比"],
     ["docs/projects/performance.md", "多维性能比较"],
+    ["docs/projects/normalization.md", "归一化与完整训练"],
   ] },
   manual: { title: "手册", pages: [
     ["docs/README.md", "手册目录"],

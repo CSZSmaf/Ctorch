@@ -55,12 +55,13 @@ __global__ void sgd_kernel(float* parameter, const float* gradient, float* veloc
 
 /// 单参数布局内核和连续参数批量内核共用每个元素的矩估计与衰减公式。
 struct AdamArithmetic {
-    float learning_rate, beta1, beta2, epsilon, weight_decay, inverse_bias1, inverse_bias2, decay;
+    float learning_rate, beta1, beta2, weight1, weight2, epsilon, weight_decay, inverse_bias1, inverse_bias2, decay;
     bool coupled_decay;
 
     __device__ explicit AdamArithmetic(const numeric::AdamStep& step)
         : learning_rate(static_cast<float>(step.learning_rate)), beta1(static_cast<float>(step.beta1)),
-          beta2(static_cast<float>(step.beta2)), epsilon(static_cast<float>(step.epsilon)),
+          beta2(static_cast<float>(step.beta2)), weight1(static_cast<float>(1.0 - step.beta1)),
+          weight2(static_cast<float>(1.0 - step.beta2)), epsilon(static_cast<float>(step.epsilon)),
           weight_decay(static_cast<float>(step.weight_decay)), inverse_bias1(static_cast<float>(step.inverse_bias1)),
           inverse_bias2(static_cast<float>(step.inverse_bias2)),
           decay(step.decoupled ? 1.0f - learning_rate * weight_decay : 1.0f),
@@ -68,8 +69,9 @@ struct AdamArithmetic {
 
     __device__ void operator()(float& parameter, float gradient, float& first, float& second) const {
         if (coupled_decay) gradient += weight_decay * parameter;
-        first = beta1 * first + (1.0f - beta1) * gradient;
-        second = beta2 * second + (1.0f - beta2) * gradient * gradient;
+        // 差值先按超参数精度计算，再转换到累积类型，与偏差校正使用同一组系数。
+        first = beta1 * first + weight1 * gradient;
+        second = beta2 * second + weight2 * gradient * gradient;
         const float update = first * inverse_bias1 / (sqrtf(second * inverse_bias2) + epsilon);
         parameter = decay * parameter - learning_rate * update;
     }

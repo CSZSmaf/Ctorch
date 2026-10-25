@@ -62,6 +62,7 @@ add_library(ctorch
     src/kernels/cpu/comparison.cpp
     src/kernels/cpu/reduction.cpp
     src/kernels/cpu/normalization.cpp
+    src/kernels/cpu/batch_normalization.cpp
     src/kernels/cpu/matmul.cpp
     src/kernels/cpu/indexing.cpp
     src/kernels/cpu/loss.cpp
@@ -165,6 +166,7 @@ if(CTORCH_USE_CUDA)
         src/kernels/cuda/comparison.cu
         src/kernels/cuda/reduction.cu
         src/kernels/cuda/normalization.cu
+        src/kernels/cuda/batch_normalization.cu
         src/kernels/cuda/matmul.cpp
         src/kernels/cuda/linear.cpp
         src/kernels/cuda/indexing.cu

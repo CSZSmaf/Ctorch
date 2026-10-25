@@ -47,6 +47,8 @@ const Backend& cuda_backend() {
         .softmax_backward = cuda::softmax_backward,
         .normalization = cuda::normalization,
         .normalization_backward = cuda::normalization_backward,
+        .batch_normalization = cuda::batch_normalization,
+        .batch_normalization_backward = cuda::batch_normalization_backward,
         .gather = cuda::gather,
         .repeat = cuda::repeat,
         .repeat_backward_into = cuda::repeat_backward_into,

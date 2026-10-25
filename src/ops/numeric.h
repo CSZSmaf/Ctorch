@@ -149,17 +149,28 @@ TensorData softmax_backward(const TensorData& grad, const TensorData& output,
                            Index axis, bool logarithmic);
 
 enum class NormalizationKind { layer, rms };
-/// statistics 的两行分别存均值与倒标准差；无需求导时不分配该缓冲。
+/// statistics 的两行分别存均值与逆标准差；逐行归一化在无需求导时省去该缓冲。
 struct NormalizationResult { TensorData output; std::optional<TensorData> statistics; };
-struct NormalizationNeeds { bool input, weight, bias; };
-struct NormalizationGradients { std::optional<TensorData> input, weight, bias; };
+/// 三个连续目标依次对应输入、权重和偏置；累计标志决定覆盖还是追加贡献。
+struct NormalizationGradients {
+    std::optional<TensorData> input, weight, bias;
+    std::array<bool, 3> accumulate{};
+};
+struct BatchNormalizationState { TensorData mean, variance; };
 /// 输入保留存储精度，仿射参数使用累积类型；width 是末尾归一化维度的元素数。
 NormalizationResult normalization(const TensorData& input, const std::optional<TensorData>& weight,
     const std::optional<TensorData>& bias, Index width, double epsilon, NormalizationKind kind,
     bool save_statistics);
-NormalizationGradients normalization_backward(const TensorData& grad, const TensorData& input,
+void normalization_backward(const TensorData& grad, const TensorData& input,
     const TensorData& statistics, const std::optional<TensorData>& weight,
-    const Shape& normalized_shape, NormalizationKind kind, NormalizationNeeds needs);
+    Index width, NormalizationKind kind, NormalizationGradients& targets);
+/// 通道轴为 1；统计缓冲保存均值与逆标准差，运行方差使用无偏估计。
+NormalizationResult batch_normalization(const TensorData& input, const std::optional<TensorData>& weight,
+    const std::optional<TensorData>& bias, std::optional<BatchNormalizationState> state,
+    bool training, double momentum, double epsilon);
+void batch_normalization_backward(const TensorData& grad, const TensorData& input,
+    const TensorData& statistics, const std::optional<TensorData>& weight,
+    bool batch_statistics, NormalizationGradients& targets);
 
 TensorData index_select(const TensorData& input, Index axis, const TensorData& indices);
 /// 索引与周期反向只追加贡献，目标由调用方初始化。

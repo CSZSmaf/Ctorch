@@ -15,12 +15,14 @@ void dl_axpy_f64(size_t n, double alpha, const double* x, double* y) {
 }
 
 void dl_adamw_f32(size_t n, float* parameter, const float* gradient, float* first, float* second,
-                  float rate, float beta1, float beta2, float epsilon, float decay,
+                  float rate, double beta1, double beta2, float epsilon, float decay,
                   float inverse_bias1, float inverse_bias2) {
+    const float b1 = (float)beta1, b2 = (float)beta2;
+    const float w1 = (float)(1.0 - beta1), w2 = (float)(1.0 - beta2);
     for (size_t i = 0; i < n; ++i) {
         const float g = gradient[i];
-        first[i] = beta1 * first[i] + (1.0f - beta1) * g;
-        second[i] = beta2 * second[i] + (1.0f - beta2) * g * g;
+        first[i] = b1 * first[i] + w1 * g;
+        second[i] = b2 * second[i] + w2 * g * g;
         const float direction = first[i] * inverse_bias1
             / (sqrtf(second[i] * inverse_bias2) + epsilon);
         parameter[i] = (1.0f - rate * decay) * parameter[i] - rate * direction;

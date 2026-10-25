@@ -11,7 +11,7 @@
 
 MLP 和 LeNet 适合第一次运行真实数据训练。ResNet 和 Transformer 使用更多模块，适合练习如何组织一个完整的单机训练项目。[框架结果对比](comparison.md)提供 Ctorch、PyTorch 和 TensorFlow 的实际训练结果、数值误差与 CPU 推理耗时。
 
-[多维性能比较](performance.md)进一步比较不同规模、精度与执行配置下的 CUDA 和 CPU 推理、完整训练、显存及首次调用开销。
+[多维性能比较](performance.md)进一步比较不同规模、精度与执行配置下的 CUDA 和 CPU 推理、完整训练、显存及首次调用开销。[归一化与完整训练](normalization.md)比较 BatchNorm 通道归约、直接写入梯度和 PyTorch 编译配置，并说明编码器的数值差异。
 
 ## 构建程序
 

@@ -206,17 +206,27 @@ NormalizationResult normalization(const TensorData& input, const std::optional<T
     return result;
 }
 
-NormalizationGradients normalization_backward(const TensorData& grad, const TensorData& input,
+void normalization_backward(const TensorData& grad, const TensorData& input,
     const TensorData& statistics, const std::optional<TensorData>& weight,
-    const Shape& normalized_shape, NormalizationKind kind, NormalizationNeeds needs) {
-    const auto dtype = accumulation_dtype(input.dtype);
-    NormalizationGradients result;
-    if (needs.input) result.input = empty_data(input.layout.sizes, dtype, input.device());
-    if (needs.weight) result.weight = empty_data(normalized_shape, dtype, input.device());
-    if (needs.bias) result.bias = empty_data(normalized_shape, dtype, input.device());
+    Index width, NormalizationKind kind, NormalizationGradients& targets) {
     backend(input.device()).normalization_backward(grad, input, statistics, weight,
-        numel(normalized_shape), kind, result);
+        width, kind, targets);
+}
+
+NormalizationResult batch_normalization(const TensorData& input, const std::optional<TensorData>& weight,
+    const std::optional<TensorData>& bias, std::optional<BatchNormalizationState> state,
+    bool training, double momentum, double epsilon) {
+    const auto dtype = accumulation_dtype(input.dtype);
+    NormalizationResult result{empty_data(input.layout.sizes, dtype, input.device()),
+        empty_data({2, input.layout.sizes[1]}, dtype, input.device())};
+    backend(input.device()).batch_normalization(input, weight, bias, state, training, momentum, epsilon, result);
     return result;
+}
+
+void batch_normalization_backward(const TensorData& grad, const TensorData& input,
+    const TensorData& statistics, const std::optional<TensorData>& weight,
+    bool batch_statistics, NormalizationGradients& targets) {
+    backend(input.device()).batch_normalization_backward(grad, input, statistics, weight, batch_statistics, targets);
 }
 
 TensorData gather(const TensorData& input, Index axis, const TensorData& indices) {

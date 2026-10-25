@@ -67,8 +67,8 @@ void adam_one(const numeric::AdamUpdate& update) {
         if (parameter.dtype == DType::f32) {
             dl_adamw_f32(count, parameter.mutable_data<float>(), gradient.data<float>(),
                          first.mutable_data<float>(), second.mutable_data<float>(),
-                         static_cast<float>(step.learning_rate), static_cast<float>(step.beta1),
-                         static_cast<float>(step.beta2), static_cast<float>(step.epsilon),
+                         static_cast<float>(step.learning_rate), step.beta1,
+                         step.beta2, static_cast<float>(step.epsilon),
                          static_cast<float>(step.weight_decay), static_cast<float>(step.inverse_bias1),
                          static_cast<float>(step.inverse_bias2));
         } else {
@@ -89,6 +89,7 @@ void adam_one(const numeric::AdamUpdate& update) {
         const T rate = static_cast<T>(step.learning_rate);
         const T beta1 = static_cast<T>(step.beta1);
         const T beta2 = static_cast<T>(step.beta2);
+        const T weight1 = static_cast<T>(1.0 - step.beta1), weight2 = static_cast<T>(1.0 - step.beta2);
         const T decay = step.decoupled ? T{1} - rate * static_cast<T>(step.weight_decay) : T{1};
         plan.for_each([&](Index, const auto& offset) {
             T g = updates[offset[1]];
@@ -96,8 +97,8 @@ void adam_one(const numeric::AdamUpdate& update) {
                 g += static_cast<T>(step.weight_decay) * values[offset[0]];
             T& m = moments[offset[2]];
             T& v = squares[offset[3]];
-            m = beta1 * m + (T{1} - beta1) * g;
-            v = beta2 * v + (T{1} - beta2) * g * g;
+            m = beta1 * m + weight1 * g;
+            v = beta2 * v + weight2 * g * g;
             const T update = m * static_cast<T>(step.inverse_bias1)
                 / (std::sqrt(v * static_cast<T>(step.inverse_bias2)) + static_cast<T>(step.epsilon));
             values[offset[0]] = decay * values[offset[0]] - rate * update;

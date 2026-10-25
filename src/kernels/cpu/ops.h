@@ -50,6 +50,12 @@ void normalization(const TensorData& input, const std::optional<TensorData>& wei
 void normalization_backward(const TensorData& grad, const TensorData& input,
     const TensorData& statistics, const std::optional<TensorData>& weight, Index width,
     numeric::NormalizationKind kind, numeric::NormalizationGradients& result);
+void batch_normalization(const TensorData& input, const std::optional<TensorData>& weight,
+    const std::optional<TensorData>& bias, std::optional<numeric::BatchNormalizationState>& state,
+    bool training, double momentum, double epsilon, numeric::NormalizationResult& result);
+void batch_normalization_backward(const TensorData& grad, const TensorData& input,
+    const TensorData& statistics, const std::optional<TensorData>& weight,
+    bool batch_statistics, numeric::NormalizationGradients& result);
 TensorData gather(const TensorData& input, Index axis, const TensorData& indices);
 TensorData repeat(const TensorData& input, Shape shape);
 void repeat_backward_into(TensorData& target, const TensorData& grad);

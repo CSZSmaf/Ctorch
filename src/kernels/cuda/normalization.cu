@@ -44,7 +44,7 @@ __global__ void normalization_kernel(const T* input, const float* weight, const 
 template <class T>
 __global__ void normalization_input_backward_kernel(const float* grad, const T* input,
     const float* statistics, const float* weight, float* output, Index rows, Index width,
-    bool centered, IndexMap grad_layout, IndexMap input_layout, IndexMap weight_layout) {
+    bool centered, bool accumulate, IndexMap grad_layout, IndexMap input_layout, IndexMap weight_layout) {
     __shared__ float shared[block_size];
     const float inverse_width = 1.0f / static_cast<float>(width);
     for (Index row = blockIdx.x; row < rows; row += gridDim.x) {
@@ -64,7 +64,8 @@ __global__ void normalization_input_backward_kernel(const float* grad, const T* 
             const float z = (storage_cast<float>(input[input_layout.offset(base + col)]) - mean) * inverse_std;
             float value = grad[grad_layout.offset(base + col)];
             if (weight) value *= weight[weight_layout.offset(col)];
-            output[base + col] = (value - average - z * projection) * inverse_std;
+            const float contribution = (value - average - z * projection) * inverse_std;
+            output[base + col] = (accumulate ? output[base + col] : 0.0f) + contribution;
         }
     }
 }
@@ -73,7 +74,7 @@ __global__ void normalization_input_backward_kernel(const float* grad, const T* 
 template <class T>
 __global__ void normalization_parameter_kernel(const float* grad, const T* input,
     const float* statistics, float* dw, float* db, Index rows, Index width, Index parts,
-    IndexMap grad_layout, IndexMap input_layout) {
+    bool add_weight, bool add_bias, IndexMap grad_layout, IndexMap input_layout) {
     const Index columns = (width + blockDim.x - 1) / blockDim.x;
     for (Index task = blockIdx.x; task < parts * columns; task += gridDim.x) {
         const auto part = task / columns;
@@ -90,22 +91,22 @@ __global__ void normalization_parameter_kernel(const float* grad, const T* input
             }
             if (db) bias_sum += value;
         }
-        if (dw) dw[part * width + col] = weight_sum;
-        if (db) db[part * width + col] = bias_sum;
+        if (dw) dw[part * width + col] = (add_weight ? dw[part * width + col] : 0.0f) + weight_sum;
+        if (db) db[part * width + col] = (add_bias ? db[part * width + col] : 0.0f) + bias_sum;
     }
 }
 
 /// 按固定分区顺序合并，避免多个 block 原子写入同一参数。
 __global__ void normalization_parameter_sum_kernel(const float* weight_parts, const float* bias_parts,
-    float* dw, float* db, Index width, Index parts) {
+    float* dw, float* db, Index width, Index parts, bool add_weight, bool add_bias) {
     for (Index col = blockIdx.x * blockDim.x + threadIdx.x; col < width; col += gridDim.x * blockDim.x) {
         float weight_sum = 0.0f, bias_sum = 0.0f;
         for (Index part = 0; part < parts; ++part) {
             if (dw) weight_sum += weight_parts[part * width + col];
             if (db) bias_sum += bias_parts[part * width + col];
         }
-        if (dw) dw[col] = weight_sum;
-        if (db) db[col] = bias_sum;
+        if (dw) dw[col] = (add_weight ? dw[col] : 0.0f) + weight_sum;
+        if (db) db[col] = (add_bias ? db[col] : 0.0f) + bias_sum;
     }
 }
 
@@ -138,7 +139,7 @@ void normalization_backward(const TensorData& grad, const TensorData& input,
             normalization_input_backward_kernel<<<row_grid_size(rows), block_size, 0, execution.stream()>>>(
                 grad.data<float>(), input.data<T>(), statistics.data<float>(),
                 weight ? weight->data<float>() : nullptr, result.input->mutable_data<float>(), rows, width,
-                kind == numeric::NormalizationKind::layer, IndexMap(grad.layout), IndexMap(input.layout),
+                kind == numeric::NormalizationKind::layer, result.accumulate[0], IndexMap(grad.layout), IndexMap(input.layout),
                 weight ? IndexMap(weight->layout) : IndexMap{});
         });
         check(cudaGetLastError());
@@ -157,12 +158,13 @@ void normalization_backward(const TensorData& grad, const TensorData& input,
         visit_storage(input.dtype, [&]<class T>() {
             normalization_parameter_kernel<<<row_grid_size(tasks), block_size, 0, execution.stream()>>>(
                 grad.data<float>(), input.data<T>(), statistics.data<float>(), partial_dw, partial_db,
-                rows, width, parts, IndexMap(grad.layout), IndexMap(input.layout));
+                rows, width, parts, parts == 1 && result.accumulate[1], parts == 1 && result.accumulate[2],
+                IndexMap(grad.layout), IndexMap(input.layout));
         });
         check(cudaGetLastError());
         if (parts > 1) {
             normalization_parameter_sum_kernel<<<grid_size(width), block_size, 0, execution.stream()>>>(
-                partial_dw, partial_db, dw, db, width, parts);
+                partial_dw, partial_db, dw, db, width, parts, result.accumulate[1], result.accumulate[2]);
             check(cudaGetLastError());
         }
     }

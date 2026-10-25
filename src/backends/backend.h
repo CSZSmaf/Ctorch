@@ -62,6 +62,11 @@ struct Backend {
     void (*normalization_backward)(const TensorData&, const TensorData&, const TensorData&,
         const std::optional<TensorData>&, Index, numeric::NormalizationKind,
         numeric::NormalizationGradients&);
+    void (*batch_normalization)(const TensorData&, const std::optional<TensorData>&,
+        const std::optional<TensorData>&, std::optional<numeric::BatchNormalizationState>&,
+        bool, double, double, numeric::NormalizationResult&);
+    void (*batch_normalization_backward)(const TensorData&, const TensorData&, const TensorData&,
+        const std::optional<TensorData>&, bool, numeric::NormalizationGradients&);
     TensorData (*gather)(const TensorData&, Index, const TensorData&);
     TensorData (*repeat)(const TensorData&, Shape);
     void (*repeat_backward_into)(TensorData&, const TensorData&);

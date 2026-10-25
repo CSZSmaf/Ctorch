@@ -16,9 +16,9 @@ struct DnnDeleter {
     void operator()(cudnnHandle_t handle) const noexcept {
         int previous = 0;
         cudaGetDevice(&previous);
-        cudaSetDevice(device);
+        if (previous != device) cudaSetDevice(device);
         cudnnDestroy(handle);
-        cudaSetDevice(previous);
+        if (previous != device) cudaSetDevice(previous);
     }
 };
 

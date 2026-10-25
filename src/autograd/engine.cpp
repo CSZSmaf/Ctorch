@@ -81,6 +81,20 @@ void execute_backward(std::vector<NodeTask>& order, GradSink& sink,
 
 } // namespace
 
+Node::~Node() {
+    // 独占分支逐项交接到工作列表；仍由其他结果持有的节点保留完整输入。
+    // 复用当前边列表，让长链的释放使用固定调用栈。
+    auto pending = std::move(inputs);
+    while (!pending.empty()) {
+        auto node = std::move(pending.back().node);
+        pending.pop_back();
+        if (node && node.use_count() == 1) {
+            for (auto& input : node->inputs) pending.push_back(std::move(input));
+            node->inputs.clear();
+        }
+    }
+}
+
 void GradSlot::accumulate(TensorData contribution) {
     if (value) {
         numeric::add_into(*value, contribution);

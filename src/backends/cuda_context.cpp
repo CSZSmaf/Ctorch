@@ -18,9 +18,9 @@ namespace {
 template <class Release> void release_on_device(int device, Release release) noexcept {
     int previous = 0;
     cudaGetDevice(&previous);
-    cudaSetDevice(device);
+    if (previous != device) cudaSetDevice(device);
     release();
-    cudaSetDevice(previous);
+    if (previous != device) cudaSetDevice(previous);
 }
 
 cudaStream_t create_stream() {

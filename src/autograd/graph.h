@@ -64,7 +64,7 @@ private:
 
 struct Node {
     explicit Node(std::vector<Edge> inputs) : inputs(std::move(inputs)) {}
-    virtual ~Node() = default;
+    virtual ~Node();
     /// 引擎交接已汇合的梯度，普通 VJP 只读借用，叶节点直接接入梯度槽。
     virtual void backward(TensorData grad, GradSink& sink) = 0;
     virtual void release_saved() = 0;

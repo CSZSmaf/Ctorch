@@ -25,14 +25,15 @@ TensorData cast(const TensorData& input, DType dtype);
 void copy_into(TensorData& target, const TensorData& source);
 void axpy(TensorData& target, const TensorData& input, double alpha);
 TensorData unary(const TensorData& input, Unary operation);
-TensorData unary_backward(const TensorData& grad, const TensorData& saved, Unary operation);
+void unary_backward_into(TensorData& target, const TensorData& grad, const TensorData& saved,
+                         Unary operation, bool accumulate);
 TensorData add(const TensorData& a, const TensorData& b);
 TensorData add_relu(const TensorData& a, const TensorData& b);
 TensorData sub(const TensorData& a, const TensorData& b);
 TensorData mul(const TensorData& a, const TensorData& b);
 TensorData div(const TensorData& a, const TensorData& b);
 TensorData pow(const TensorData& a, const TensorData& b);
-TensorData scale(const TensorData& input, double factor);
+void scale_into(TensorData& target, const TensorData& input, double factor, bool accumulate);
 TensorData where(const TensorData& mask, const TensorData& a, const TensorData& b);
 TensorData compare(const TensorData& a, const TensorData& b, numeric::Compare operation);
 TensorData sum(const TensorData& input, const Shape& axes, KeepDim keep);

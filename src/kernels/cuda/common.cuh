@@ -11,6 +11,7 @@ namespace dl::detail::cuda {
 
 constexpr int block_size = 256;
 constexpr int warp_size = 32;
+constexpr int block_warps = block_size / warp_size;
 constexpr int max_rank = 16;
 
 inline int grid_size(Index count) {
@@ -76,17 +77,32 @@ template <bool Maximum> __device__ float reduce_pair(float a, float b) {
     }
 }
 
-/// 一个 block 内的固定树形归约，所有线程得到同一个结果。
+/// warp 内通过寄存器交换合并，所有线程参与同一棵固定归约树。
+template <bool Maximum> __device__ float warp_reduce(float value) {
+    for (int width = warp_size / 2; width > 0; width /= 2)
+        value = reduce_pair<Maximum>(value, __shfl_down_sync(0xffffffffu, value, width));
+    return value;
+}
+
+/// 跨 warp 的部分按原树形顺序在寄存器中合并，最后由一个 warp 完成归约。
+/// 调用方使用 block_size 个线程与共享槽；所有线程取得结果后再复用工作区。
 template <bool Maximum> __device__ float block_reduce(float value, float* shared) {
     const int lane = threadIdx.x;
     shared[lane] = value;
     __syncthreads();
-    for (int width = block_size / 2; width > 0; width /= 2) {
-        if (lane < width) {
-            shared[lane] = reduce_pair<Maximum>(shared[lane], shared[lane + width]);
+    if (lane < warp_size) {
+        float parts[block_warps];
+        #pragma unroll
+        for (int i = 0; i < block_warps; ++i) parts[i] = shared[lane + i * warp_size];
+        #pragma unroll
+        for (int width = block_warps / 2; width > 0; width /= 2) {
+            #pragma unroll
+            for (int i = 0; i < width; ++i) parts[i] = reduce_pair<Maximum>(parts[i], parts[i + width]);
         }
-        __syncthreads();
+        value = warp_reduce<Maximum>(parts[0]);
+        if (lane == 0) shared[0] = value;
     }
+    __syncthreads();
     const float result = shared[0];
     __syncthreads();
     return result;

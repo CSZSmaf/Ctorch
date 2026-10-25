@@ -71,12 +71,11 @@ Tensor reduce(const Tensor& input, Shape axes, KeepDim keep, bool average) {
     }
     auto expanded_shape = detail::numeric::reduced_shape(input.shape(), axes, KeepDim::yes);
     return detail::record(std::move(result), {detail::gradient_edge(input)},
-        [shape = input.shape(), expanded_shape = std::move(expanded_shape), factor, average]
+        [shape = input.shape(), expanded_shape = std::move(expanded_shape), factor]
         (const auto& grad, auto& sink, const auto& edges) {
             auto kept = detail::numeric::reshape(grad, expanded_shape);
             auto expanded = detail::numeric::expand(kept, shape);
-            if (average) sink.add_owned(edges[0], detail::numeric::scale(expanded, factor));
-            else sink.add(edges[0], expanded);
+            sink.add_scaled(edges[0], expanded, factor);
         });
 }
 

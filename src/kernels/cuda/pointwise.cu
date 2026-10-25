@@ -8,6 +8,11 @@
 namespace dl::detail::cuda {
 namespace {
 
+/// 连续目标统一承接首次写入与分支累加，贡献在相加前完成 FP32 舍入。
+__device__ void write_value(float& target, float value, bool accumulate) {
+    target = accumulate ? __fadd_rn(target, value) : value;
+}
+
 template <class T> __global__ void fill_kernel(T* output, Index count, T value) {
     for (Index index = static_cast<Index>(blockIdx.x) * blockDim.x + threadIdx.x;
          index < count; index += static_cast<Index>(blockDim.x) * gridDim.x) {
@@ -23,12 +28,12 @@ __global__ void copy_kernel(const From* input, To* output, Index count, IndexMap
     }
 }
 
-template <class T, class Function>
+template <bool Accumulate = false, class T, class Function>
 __global__ void unary_kernel(const T* input, float* output, Index count, IndexMap layout,
                               Function function) {
     for (Index index = static_cast<Index>(blockIdx.x) * blockDim.x + threadIdx.x;
          index < count; index += static_cast<Index>(blockDim.x) * gridDim.x) {
-        output[index] = function(storage_cast<float>(input[layout.offset(index)]));
+        write_value(output[index], function(storage_cast<float>(input[layout.offset(index)])), Accumulate);
     }
 }
 
@@ -98,10 +103,11 @@ template <Unary Operation> struct UnaryFunction {
 
 template <class T, class Function>
 __global__ void unary_backward_kernel(const float* grad, const T* saved, float* output,
-                                      Index count, IndexMap gradient, IndexMap value, Function function) {
+                                      Index count, IndexMap gradient, IndexMap value, Function function, bool accumulate) {
     for (Index index = static_cast<Index>(blockIdx.x) * blockDim.x + threadIdx.x;
          index < count; index += static_cast<Index>(blockDim.x) * gridDim.x) {
-        output[index] = function(grad[gradient.offset(index)], storage_cast<float>(saved[value.offset(index)]));
+        write_value(output[index],
+            function(grad[gradient.offset(index)], storage_cast<float>(saved[value.offset(index)])), accumulate);
     }
 }
 
@@ -258,8 +264,8 @@ TensorData unary(const TensorData& input, Unary operation) {
     }
     return result;
 }
-TensorData unary_backward(const TensorData& grad, const TensorData& saved, Unary operation) {
-    auto result = empty_data(saved.layout.sizes, accumulation_dtype(saved.dtype), saved.device());
+void unary_backward_into(TensorData& result, const TensorData& grad, const TensorData& saved,
+                         Unary operation, bool accumulate) {
     const auto count = saved.layout.numel();
     if (count != 0) {
         Execution execution(saved);
@@ -267,12 +273,11 @@ TensorData unary_backward(const TensorData& grad, const TensorData& saved, Unary
             visit_storage(saved.dtype, [&]<class T> {
                 unary_backward_kernel<<<grid_size(count), block_size, 0, execution.stream()>>>(
                     grad.data<float>(), saved.data<T>(), result.mutable_data<float>(), count,
-                    IndexMap(grad.layout), IndexMap(saved.layout), UnaryFunction<Operation>{});
+                    IndexMap(grad.layout), IndexMap(saved.layout), UnaryFunction<Operation>{}, accumulate);
             });
         });
         check(cudaGetLastError());
     }
-    return result;
 }
 TensorData add(const TensorData& a, const TensorData& b) { return binary<Binary::add>(a, b); }
 TensorData add_relu(const TensorData& a, const TensorData& b) {
@@ -295,19 +300,21 @@ TensorData sub(const TensorData& a, const TensorData& b) { return binary<Binary:
 TensorData mul(const TensorData& a, const TensorData& b) { return binary<Binary::mul>(a, b); }
 TensorData div(const TensorData& a, const TensorData& b) { return binary<Binary::div>(a, b); }
 TensorData pow(const TensorData& a, const TensorData& b) { return binary<Binary::pow>(a, b); }
-TensorData scale(const TensorData& input, double factor) {
-    auto result = empty_data(input.layout.sizes, accumulation_dtype(input.dtype), input.device());
+void scale_into(TensorData& result, const TensorData& input, double factor, bool accumulate) {
     const auto count = input.layout.numel();
     if (count != 0) {
         Execution execution(input);
-        visit_storage(input.dtype, [&]<class T> {
-            unary_kernel<<<grid_size(count), block_size, 0, execution.stream()>>>(
-                input.data<T>(), result.mutable_data<float>(), count, IndexMap(input.layout),
-                Scale{static_cast<float>(factor)});
-        });
+        auto launch = [&]<bool Accumulate> {
+            visit_storage(input.dtype, [&]<class T> {
+                unary_kernel<Accumulate><<<grid_size(count), block_size, 0, execution.stream()>>>(
+                    input.data<T>(), result.mutable_data<float>(), count, IndexMap(input.layout),
+                    Scale{static_cast<float>(factor)});
+            });
+        };
+        if (accumulate) launch.template operator()<true>();
+        else launch.template operator()<false>();
         check(cudaGetLastError());
     }
-    return result;
 }
 TensorData where(const TensorData& mask, const TensorData& a, const TensorData& b) {
     auto shape = broadcast_shape(mask.layout.sizes, broadcast_shape(a.layout.sizes, b.layout.sizes));

@@ -98,6 +98,9 @@ void adagrad(std::span<const AdagradUpdate> updates);
 TensorData unary(const TensorData& input, Unary operation);
 /// grad 与 saved 同形同设备，grad 使用 saved 的累积类型，按各自布局直接计算 VJP。
 TensorData unary_backward(const TensorData& grad, const TensorData& saved, Unary operation);
+/// 写回接口接收独立连续目标，accumulate 选择覆盖或累加；保存值与梯度保留各自布局。
+void unary_backward_into(TensorData& target, const TensorData& grad, const TensorData& saved,
+                         Unary operation, bool accumulate);
 TensorData add(const TensorData& a, const TensorData& b);
 TensorData add_relu(const TensorData& a, const TensorData& b);
 TensorData sub(const TensorData& a, const TensorData& b);
@@ -105,6 +108,7 @@ TensorData mul(const TensorData& a, const TensorData& b);
 TensorData div(const TensorData& a, const TensorData& b);
 TensorData pow(const TensorData& a, const TensorData& b);
 TensorData scale(const TensorData& input, double factor);
+void scale_into(TensorData& target, const TensorData& input, double factor, bool accumulate);
 TensorData where(const TensorData& mask, const TensorData& a, const TensorData& b);
 TensorData compare(const TensorData& a, const TensorData& b, Compare operation);
 TensorData concat(std::span<const TensorData> inputs, Index axis);

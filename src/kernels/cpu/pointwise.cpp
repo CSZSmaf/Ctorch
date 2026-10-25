@@ -177,13 +177,14 @@ TensorData unary(const TensorData& input, Unary operation) {
     return result;
 }
 
-TensorData unary_backward(const TensorData& grad, const TensorData& saved, Unary operation) {
-    auto result = empty_data(saved.layout.sizes, accumulation_dtype(saved.dtype));
+void unary_backward_into(TensorData& result, const TensorData& grad, const TensorData& saved,
+                         Unary operation, bool accumulate) {
     visit_storage(saved.dtype, [&]<class T> {
         using A = FloatAccumulator<T>;
-        dispatch_backward<A>(operation, [&](auto kernel) { cpu::binary<A, T>(grad, saved, result, kernel); });
+        dispatch_backward<A>(operation, [&](auto kernel) {
+            cpu::binary<A, T>(grad, saved, result, kernel, accumulate);
+        });
     });
-    return result;
 }
 
 TensorData add(const TensorData& a, const TensorData& b) {
@@ -212,13 +213,11 @@ TensorData pow(const TensorData& a, const TensorData& b) {
     return binary(a, b, [](auto x, auto y) { return std::pow(x, y); });
 }
 
-TensorData scale(const TensorData& input, double factor) {
-    auto result = empty_data(input.layout.sizes, accumulation_dtype(input.dtype));
+void scale_into(TensorData& result, const TensorData& input, double factor, bool accumulate) {
     visit_storage(input.dtype, [&]<class T> {
         using A = FloatAccumulator<T>;
-        cpu::unary<T, A>(input, result, [factor](A value) { return value * static_cast<A>(factor); });
+        cpu::unary<T, A>(input, result, [factor](A value) { return value * static_cast<A>(factor); }, accumulate);
     });
-    return result;
 }
 
 TensorData where(const TensorData& mask, const TensorData& a, const TensorData& b) {

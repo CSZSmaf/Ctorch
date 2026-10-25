@@ -108,6 +108,12 @@ void GradSink::add_reduced(const Edge& edge, const TensorData& contribution, con
     numeric::sum_to_shape_into(output.value, contribution, output.accumulate);
 }
 
+void GradSink::add_scaled(const Edge& edge, const TensorData& contribution, double factor) {
+    if (!needs(edge)) return;
+    auto output = target(edge, contribution.layout.sizes, contribution.dtype, contribution.device());
+    numeric::scale_into(output.value, contribution, factor, output.accumulate);
+}
+
 GradTarget GradSink::target(const Edge& edge, const Shape& shape, DType dtype, Device device, GradInit init) {
     auto position = gradients_.find(edge.node.get());
     if (position != gradients_.end()) return {position->second, true};

@@ -35,14 +35,14 @@ struct Backend {
     void (*copy_into)(TensorData&, const TensorData&);
     void (*axpy)(TensorData&, const TensorData&, double);
     TensorData (*unary)(const TensorData&, numeric::Unary);
-    TensorData (*unary_backward)(const TensorData&, const TensorData&, numeric::Unary);
+    void (*unary_backward_into)(TensorData&, const TensorData&, const TensorData&, numeric::Unary, bool);
     TensorData (*add)(const TensorData&, const TensorData&);
     TensorData (*add_relu)(const TensorData&, const TensorData&);
     TensorData (*sub)(const TensorData&, const TensorData&);
     TensorData (*mul)(const TensorData&, const TensorData&);
     TensorData (*div)(const TensorData&, const TensorData&);
     TensorData (*pow)(const TensorData&, const TensorData&);
-    TensorData (*scale)(const TensorData&, double);
+    void (*scale_into)(TensorData&, const TensorData&, double, bool);
     TensorData (*where)(const TensorData&, const TensorData&, const TensorData&);
     TensorData (*compare)(const TensorData&, const TensorData&, numeric::Compare);
     TensorData (*sum)(const TensorData&, const Shape&, KeepDim);

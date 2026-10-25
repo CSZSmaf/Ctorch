@@ -48,6 +48,8 @@ public:
     void add_transferred(const Edge& edge, TensorData contribution);
     /// 借用广播后的贡献，按原输入形状直接归约到累计目标。
     void add_reduced(const Edge& edge, const TensorData& contribution, const Shape& shape);
+    /// 缩放与累计共用一次遍历，输入可保持广播或切片布局。
+    void add_scaled(const Edge& edge, const TensorData& contribution, double factor);
     /// 为已选中的边取得连续目标；初值仅用于新目标，已有贡献始终保留。
     GradTarget target(const Edge& edge, const Shape& shape, DType dtype, Device device,
                       GradInit init = GradInit::uninitialized);

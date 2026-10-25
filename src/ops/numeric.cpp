@@ -108,7 +108,13 @@ TensorData unary(const TensorData& input, Unary operation) {
     return backend(input.device()).unary(input, operation);
 }
 TensorData unary_backward(const TensorData& grad, const TensorData& saved, Unary operation) {
-    return backend(saved.device()).unary_backward(grad, saved, operation);
+    auto result = empty_data(saved.layout.sizes, accumulation_dtype(saved.dtype), saved.device());
+    unary_backward_into(result, grad, saved, operation, false);
+    return result;
+}
+void unary_backward_into(TensorData& target, const TensorData& grad, const TensorData& saved,
+                         Unary operation, bool accumulate) {
+    backend(saved.device()).unary_backward_into(target, grad, saved, operation, accumulate);
 }
 TensorData add(const TensorData& a, const TensorData& b) { return compute_pair(backend(a.device()).add, a, b); }
 TensorData add_relu(const TensorData& a, const TensorData& b) {
@@ -119,7 +125,14 @@ TensorData sub(const TensorData& a, const TensorData& b) { return compute_pair(b
 TensorData mul(const TensorData& a, const TensorData& b) { return compute_pair(backend(a.device()).mul, a, b); }
 TensorData div(const TensorData& a, const TensorData& b) { return compute_pair(backend(a.device()).div, a, b); }
 TensorData pow(const TensorData& a, const TensorData& b) { return compute_pair(backend(a.device()).pow, a, b); }
-TensorData scale(const TensorData& input, double factor) { return backend(input.device()).scale(input, factor); }
+TensorData scale(const TensorData& input, double factor) {
+    auto result = empty_data(input.layout.sizes, accumulation_dtype(input.dtype), input.device());
+    scale_into(result, input, factor, false);
+    return result;
+}
+void scale_into(TensorData& target, const TensorData& input, double factor, bool accumulate) {
+    backend(input.device()).scale_into(target, input, factor, accumulate);
+}
 TensorData where(const TensorData& mask, const TensorData& a, const TensorData& b) {
     if (a.dtype != b.dtype && (is_low_precision(a.dtype) || is_low_precision(b.dtype))) {
         return compute_pair([&](const auto& left, const auto& right) { return backend(a.device()).where(mask, left, right); }, a, b);

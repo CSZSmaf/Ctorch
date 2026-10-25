@@ -28,7 +28,9 @@ Tensor unary(const Tensor& input, numeric::Unary operation) {
     auto saved = saves_output ? result : data_of(input);
     return record(std::move(result), {gradient_edge(input)},
         [saved = std::move(saved), operation](const auto& grad, auto& sink, const auto& edges) {
-            sink.add_owned(edges[0], numeric::unary_backward(grad, saved, operation));
+            if (!sink.needs(edges[0])) return;
+            auto target = sink.target(edges[0], saved.layout.sizes, saved.dtype, saved.device());
+            numeric::unary_backward_into(target.value, grad, saved, operation, target.accumulate);
         });
 }
 
@@ -43,7 +45,7 @@ Tensor add_or_subtract(const Tensor& a, const Tensor& b, bool subtract) {
             if (sink.needs(edges[1])) {
                 if (subtract) {
                     auto contribution = numeric::sum_to_shape(grad, b_shape);
-                    sink.add_owned(edges[1], numeric::scale(contribution, -1.0));
+                    sink.add_scaled(edges[1], contribution, -1.0);
                 } else {
                     sink.add_reduced(edges[1], grad, b_shape);
                 }
@@ -107,7 +109,7 @@ Tensor div(const Tensor& a, const Tensor& b) {
 Tensor neg(const Tensor& input) {
     return record(numeric::scale(data_of(input), -1.0), {gradient_edge(input)},
         [](const auto& grad, auto& sink, const auto& edges) {
-            sink.add_owned(edges[0], numeric::scale(grad, -1.0));
+            sink.add_scaled(edges[0], grad, -1.0);
         });
 }
 
@@ -208,7 +210,7 @@ Tensor operator*(const Tensor& input, double value) {
     // 常量直接传入缩放内核，前向与反向都只生成结果张量。
     return record(numeric::scale(data_of(input), value), {gradient_edge(input)},
         [value](const auto& grad, auto& sink, const auto& edges) {
-            sink.add_owned(edges[0], numeric::scale(grad, value));
+            sink.add_scaled(edges[0], grad, value);
         });
 }
 Tensor operator/(const Tensor& input, double value) { return div(input, scalar_like(input, value)); }

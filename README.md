@@ -68,3 +68,7 @@ ctest --test-dir ../Ctorch-build/cpu --output-on-failure
 覆盖范围与外部验证入口见[测试说明](tests/README.md)。Linux 与 Windows 的 CPU 工作流复用这套入口。
 
 框架面向单机稠密训练。一阶求导、显式设备与精度选择构成基础接口；分布式训练、高阶求导、稀疏训练和通用 JIT 不在当前接口范围内。
+
+## 版权
+
+Copyright © 2026 [CSZSmaf](https://github.com/CSZSmaf)。版权所有，详见 [版权声明](COPYRIGHT)。第三方组件遵循各自的许可证。

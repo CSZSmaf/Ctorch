@@ -66,6 +66,9 @@ struct Backend {
     void (*scatter_add_into)(TensorData&, Index, const TensorData&, const TensorData&);
     void (*cross_entropy)(const TensorData&, const TensorData&, LossReduction, std::optional<Index>,
         numeric::CrossEntropyResult&);
+    TensorData (*binary_logits)(const TensorData&, const TensorData&);
+    void (*binary_logits_backward_into)(TensorData&, const TensorData&, const TensorData&, const TensorData&,
+        double, bool, bool);
     void (*cross_entropy_backward_into)(TensorData&, const TensorData&, const TensorData&, const TensorData&,
         const TensorData&, LossReduction, std::optional<Index>, bool);
     void (*momentum)(TensorData&, const TensorData&, double, double);

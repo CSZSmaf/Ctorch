@@ -18,8 +18,13 @@ template <class T> constexpr T inverse_sqrt2pi = std::numbers::inv_sqrtpi_v<T> *
 
 template <class Function>
 TensorData binary(const TensorData& a, const TensorData& b, Function function) {
-    auto result = empty_data(broadcast_shape(a.layout.sizes, b.layout.sizes), a.dtype);
-    visit_floating(a.dtype, [&]<class T> { cpu::binary<T>(a, b, result, function); });
+    auto result = empty_data(broadcast_shape(a.layout.sizes, b.layout.sizes), accumulation_dtype(a.dtype));
+    visit_storage(a.dtype, [&]<class T> {
+        using A = FloatAccumulator<T>;
+        cpu::binary<T, T, A>(a, b, result, [&](T x, T y) {
+            return function(static_cast<A>(x), static_cast<A>(y));
+        });
+    });
     return result;
 }
 

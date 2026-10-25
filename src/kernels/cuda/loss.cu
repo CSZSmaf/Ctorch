@@ -9,6 +9,40 @@ namespace dl::detail::cuda {
 namespace {
 
 template <class T>
+__global__ void binary_logits_kernel(const T* logits, const T* labels, float* output,
+    Index count, IndexMap input, IndexMap targets) {
+    for (Index i = static_cast<Index>(blockIdx.x) * blockDim.x + threadIdx.x;
+         i < count; i += static_cast<Index>(blockDim.x) * gridDim.x) {
+        const float x = storage_cast<float>(logits[input.offset(i)]);
+        const float y = storage_cast<float>(labels[targets.offset(i)]);
+        output[i] = (x >= 0.0f ? (1.0f - y) * x : -y * x) + log1pf(expf(-fabsf(x)));
+    }
+}
+
+template <class T>
+__global__ void binary_logits_backward_kernel(const T* logits, const T* labels,
+    const float* grad, float* output, Index count, IndexMap input, IndexMap targets,
+    IndexMap seeds, float factor, bool target_gradient, bool accumulate) {
+    for (Index i = static_cast<Index>(blockIdx.x) * blockDim.x + threadIdx.x;
+         i < count; i += static_cast<Index>(blockDim.x) * gridDim.x) {
+        const float x = storage_cast<float>(logits[input.offset(i)]);
+        const float upstream = __fmul_rn(grad[seeds.offset(i)], factor);
+        float contribution = -x * upstream;
+        if (!target_gradient) {
+            const float y = storage_cast<float>(labels[targets.offset(i)]);
+            const float exponential = expf(-fabsf(x));
+            const float tail = exponential / (1.0f + exponential);
+            const float head = 1.0f / (1.0f + exponential);
+            // 两类贡献分别完成乘法舍入，再相减；硬标签的小梯度由尾概率保留。
+            const float positive = __fmul_rn(__fmul_rn(upstream, 1.0f - y), x >= 0.0f ? head : tail);
+            const float negative = __fmul_rn(__fmul_rn(upstream, y), x >= 0.0f ? tail : head);
+            contribution = __fsub_rn(positive, negative);
+        }
+        output[i] = accumulate ? __fadd_rn(output[i], contribution) : contribution;
+    }
+}
+
+template <class T>
 __global__ void cross_entropy_kernel(const T* logits, const Index* labels, float* statistics,
     float* losses, Index rows, Index classes, Index inner, IndexMap input,
     IndexMap targets, bool has_ignore, Index ignore_index) {
@@ -95,6 +129,38 @@ __global__ void cross_entropy_backward_kernel(const T* logits, const Index* labe
 }
 
 } // namespace
+
+TensorData binary_logits(const TensorData& logits, const TensorData& labels) {
+    const auto shape = broadcast_shape(logits.layout.sizes, labels.layout.sizes);
+    auto result = empty_data(shape, accumulation_dtype(logits.dtype), logits.device());
+    const auto count = result.layout.numel();
+    if (count == 0) return result;
+    Execution execution(logits);
+    visit_storage(logits.dtype, [&]<class T> {
+        binary_logits_kernel<<<grid_size(count), block_size, 0, execution.stream()>>>(
+            logits.data<T>(), labels.data<T>(), result.mutable_data<float>(), count,
+            IndexMap(shape, broadcast_strides(logits.layout, shape)),
+            IndexMap(shape, broadcast_strides(labels.layout, shape)));
+    });
+    check(cudaGetLastError());
+    return result;
+}
+
+void binary_logits_backward_into(TensorData& target, const TensorData& grad,
+    const TensorData& logits, const TensorData& labels, double factor, bool target_gradient, bool accumulate) {
+    const auto count = target.layout.numel();
+    if (count == 0) return;
+    const auto& shape = target.layout.sizes;
+    Execution execution(logits);
+    visit_storage(logits.dtype, [&]<class T> {
+        binary_logits_backward_kernel<<<grid_size(count), block_size, 0, execution.stream()>>>(
+            logits.data<T>(), labels.data<T>(), grad.data<float>(), target.mutable_data<float>(), count,
+            IndexMap(shape, broadcast_strides(logits.layout, shape)),
+            IndexMap(shape, broadcast_strides(labels.layout, shape)),
+            IndexMap(shape, broadcast_strides(grad.layout, shape)), static_cast<float>(factor), target_gradient, accumulate);
+    });
+    check(cudaGetLastError());
+}
 
 void cross_entropy(const TensorData& logits, const TensorData& labels, LossReduction reduction,
     std::optional<Index> ignore_index, CrossEntropyResult& result) {

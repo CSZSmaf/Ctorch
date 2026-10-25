@@ -16,6 +16,17 @@ int main() {
         dl::sum(x * x).backward();
         test::gradient(x, {2, 4, 6, 8, 10, 12});
 
+        for (auto dtype : {dl::DType::f16, dl::DType::bf16}) {
+            auto input = test::tensor({1, 2, 3, 4, 5, 6}, {2, 3}).astype(dtype).detach();
+            input.requires_grad_();
+            auto factor = test::tensor({2, 4}, {2}).astype(dtype);
+            auto product = input.transpose(0, 1) * factor;
+            test::expect(product.dtype() == dl::DType::f32, "low precision arithmetic accumulates in float32");
+            test::values(product, {2, 16, 4, 20, 6, 24});
+            dl::sum(product).backward();
+            test::gradient(input, {2, 2, 2, 4, 4, 4});
+        }
+
         auto data = test::tensor({-2, 1, -1, 3}, {2, 2}, true);
         auto offset = test::tensor({1, -2}, {2}, true);
         dl::plan::Graph graph;

@@ -50,6 +50,8 @@ const Backend& cuda_backend() {
         .repeat_backward_into = cuda::repeat_backward_into,
         .scatter_add_into = cuda::scatter_add_into,
         .cross_entropy = cuda::cross_entropy,
+        .binary_logits = cuda::binary_logits,
+        .binary_logits_backward_into = cuda::binary_logits_backward_into,
         .cross_entropy_backward_into = cuda::cross_entropy_backward_into,
         .momentum = cuda::momentum,
         .unscale_gradients = cuda::unscale_gradients,

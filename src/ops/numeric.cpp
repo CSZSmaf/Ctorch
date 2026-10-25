@@ -10,7 +10,7 @@ namespace {
 TensorData compute(const TensorData& input) { return cast(input, accumulation_dtype(input.dtype)); }
 
 template <class Function> auto compute_pair(Function function, const TensorData& a, const TensorData& b) {
-    if (is_low_precision(a.dtype) || is_low_precision(b.dtype)) {
+    if (a.dtype != b.dtype && (is_low_precision(a.dtype) || is_low_precision(b.dtype))) {
         const auto dtype = a.dtype == DType::f64 || b.dtype == DType::f64 ? DType::f64 : DType::f32;
         return function(cast(a, dtype), cast(b, dtype));
     }
@@ -140,7 +140,9 @@ TensorData where(const TensorData& mask, const TensorData& a, const TensorData& 
     return backend(a.device()).where(mask, a, b);
 }
 TensorData compare(const TensorData& a, const TensorData& b, Compare operation) {
-    return compute_pair([&](const auto& left, const auto& right) { return backend(a.device()).compare(left, right, operation); }, a, b);
+    return compute_pair([&](const auto& left, const auto& right) {
+        return backend(a.device()).compare(compute(left), compute(right), operation);
+    }, a, b);
 }
 TensorData sum(const TensorData& input, const Shape& axes, KeepDim keep) {
     return backend(input.device()).sum(compute(input), axes, keep);
@@ -235,6 +237,16 @@ void cross_entropy_backward_into(TensorData& target, const TensorData& grad,
     LossReduction reduction, std::optional<Index> ignore_index, bool accumulate) {
     backend(logits.device()).cross_entropy_backward_into(target, grad, logits, labels, statistics,
         reduction, ignore_index, accumulate);
+}
+TensorData binary_logits(const TensorData& logits, const TensorData& labels) {
+    return compute_pair(backend(logits.device()).binary_logits, logits, labels);
+}
+void binary_logits_backward_into(TensorData& target, const TensorData& grad,
+    const TensorData& logits, const TensorData& labels, double factor, bool target_gradient, bool accumulate) {
+    compute_pair([&](const auto& input, const auto& labels) {
+        backend(input.device()).binary_logits_backward_into(target, grad, input, labels,
+            factor, target_gradient, accumulate);
+    }, logits, labels);
 }
 void momentum(TensorData& buffer, const TensorData& gradient, double decay, double scale) {
     backend(buffer.device()).momentum(buffer, gradient, decay, scale);

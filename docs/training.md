@@ -12,6 +12,23 @@
 
 在构造优化器前迁移模型，使参数与优化器状态具有一致设备。
 
+## 分类输出与损失
+
+每个样本只属于一个类别时，模型输出各类别的 logits，标签使用 `i64` 类别编号，损失使用 `cross_entropy`。
+
+二分类和多标签分类使用 `binary_cross_entropy_with_logits`。每个输出表示一个独立类别的分数，目标与输出同形，采用 `[0,1]` 内的浮点值。二分类可以使用 `[batch, 1]`，多标签分类可以使用 `[batch, classes]`，逐像素分类可以使用 `[batch, classes, height, width]`。
+
+```cpp
+auto logits = model(input);
+auto loss = dl::binary_cross_entropy_with_logits(logits, targets);
+loss.backward();
+
+// 预测时用 sigmoid 把每个独立分数转成概率。
+auto probabilities = dl::sigmoid(logits.detach());
+```
+
+训练时直接传入 logits。该损失在内部计算稳定的对数表达式，无需先调用 sigmoid。默认 `mean` 对所有损失项取平均；`none` 返回逐项损失，可用于样本加权。目标也可以是软标签，例如 `0.8`。
+
 ## 更新与控制
 
 优化器包括 SGD、Adam、AdamW、RMSprop 和 Adagrad。参数分组各自持有学习率与权重衰减，可配合冻结、解冻、梯度裁剪和学习率调度。`zero_grad()` 清空叶梯度槽，多个微批的反向可在同一次更新前累计。

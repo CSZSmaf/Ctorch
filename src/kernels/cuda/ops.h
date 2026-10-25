@@ -56,6 +56,9 @@ void repeat_backward_into(TensorData& target, const TensorData& grad);
 void scatter_add_into(TensorData& target, Index axis, const TensorData& indices, const TensorData& source);
 void cross_entropy(const TensorData& logits, const TensorData& labels, LossReduction reduction,
     std::optional<Index> ignore_index, CrossEntropyResult& result);
+TensorData binary_logits(const TensorData& logits, const TensorData& labels);
+void binary_logits_backward_into(TensorData& target, const TensorData& grad,
+    const TensorData& logits, const TensorData& labels, double factor, bool target_gradient, bool accumulate);
 void cross_entropy_backward_into(TensorData& target, const TensorData& grad,
     const TensorData& logits, const TensorData& labels, const TensorData& statistics,
     LossReduction reduction, std::optional<Index> ignore_index, bool accumulate);

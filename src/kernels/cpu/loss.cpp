@@ -1,12 +1,55 @@
 #include "kernels/cpu/ops.h"
 
 #include "core/dispatch.h"
+#include "kernels/cpu/elementwise.h"
 
 #include <algorithm>
 #include <cmath>
 #include <limits>
 
 namespace dl::detail::cpu {
+
+TensorData binary_logits(const TensorData& logits, const TensorData& labels) {
+    auto result = empty_data(broadcast_shape(logits.layout.sizes, labels.layout.sizes), accumulation_dtype(logits.dtype));
+    visit_storage(logits.dtype, [&]<class T> {
+        using A = FloatAccumulator<T>;
+        cpu::binary<T, T, A>(logits, labels, result, [](T input, T label) {
+            const A x = static_cast<A>(input), y = static_cast<A>(label);
+            // 按符号选择线性项，尾项用 log1p 保留接近零的损失。
+            return (x >= A{0} ? (A{1} - y) * x : -y * x) + std::log1p(std::exp(-std::abs(x)));
+        });
+    });
+    return result;
+}
+
+void binary_logits_backward_into(TensorData& target, const TensorData& grad,
+    const TensorData& logits, const TensorData& labels, double factor, bool target_gradient, bool accumulate) {
+    const auto& shape = target.layout.sizes;
+    IterationPlan<3> plan(shape, {broadcast_strides(logits.layout, shape),
+        broadcast_strides(labels.layout, shape), broadcast_strides(grad.layout, shape)});
+    visit_storage(logits.dtype, [&]<class T> {
+        using A = FloatAccumulator<T>;
+        const auto* x = logits.data<T>();
+        const auto* y = labels.data<T>();
+        const auto* seed = grad.data<A>();
+        auto* output = target.mutable_data<A>();
+        plan.for_each([&](Index index, const auto& offsets) {
+            const A value = static_cast<A>(x[offsets[0]]);
+            const A upstream = seed[offsets[2]] * static_cast<A>(factor);
+            A contribution = -value * upstream;
+            if (!target_gradient) {
+                const A label = static_cast<A>(y[offsets[1]]);
+                const A exponential = std::exp(-std::abs(value));
+                const A tail = exponential / (A{1} + exponential);
+                const A head = A{1} / (A{1} + exponential);
+                const A positive = (upstream * (A{1} - label)) * (value >= A{0} ? head : tail);
+                const A negative = (upstream * label) * (value >= A{0} ? tail : head);
+                contribution = positive - negative;
+            }
+            output[index] = accumulate ? output[index] + contribution : contribution;
+        });
+    });
+}
 
 void cross_entropy(const TensorData& logits, const TensorData& labels, LossReduction reduction,
     std::optional<Index> ignore_index, CrossEntropyResult& result) {

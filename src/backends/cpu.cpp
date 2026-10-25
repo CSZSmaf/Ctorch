@@ -58,6 +58,8 @@ const Backend& cpu_backend() {
         .repeat_backward_into = cpu::repeat_backward_into,
         .scatter_add_into = cpu::scatter_add_into,
         .cross_entropy = cpu::cross_entropy,
+        .binary_logits = cpu::binary_logits,
+        .binary_logits_backward_into = cpu::binary_logits_backward_into,
         .cross_entropy_backward_into = cpu::cross_entropy_backward_into,
         .momentum = cpu::momentum,
         .unscale_gradients = cpu::unscale_gradients,

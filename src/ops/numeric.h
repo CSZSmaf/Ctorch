@@ -170,6 +170,9 @@ TensorData scatter_add(const TensorData& input, Index axis, const TensorData& in
 struct CrossEntropyResult { TensorData loss; std::optional<TensorData> statistics; };
 CrossEntropyResult cross_entropy(const TensorData& logits, const TensorData& labels,
     LossReduction reduction, std::optional<Index> ignore_index, bool save_statistics);
+TensorData binary_logits(const TensorData& logits, const TensorData& labels);
+void binary_logits_backward_into(TensorData& target, const TensorData& grad,
+    const TensorData& logits, const TensorData& labels, double factor, bool target_gradient, bool accumulate);
 void cross_entropy_backward_into(TensorData& target, const TensorData& grad,
     const TensorData& logits, const TensorData& labels, const TensorData& statistics,
     LossReduction reduction, std::optional<Index> ignore_index, bool accumulate);

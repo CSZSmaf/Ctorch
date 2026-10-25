@@ -334,6 +334,7 @@ auto encoded = encoder.forward(features, keep); // [4, 16, 32]</code></pre>
         </tbody></table>
         <p>高维分类输出遵循 <code>[N,C,...]</code> 的类别轴约定。序列模型的类别通常在末维，因此上表先把序列维展平。</p>
         <p><code>LossReduction::mean</code> 求平均值，<code>sum</code> 求总和，<code>none</code> 保留逐项损失。序列填充位置可以使用交叉熵的 <code>ignore_index</code> 参数，计算指标时也应排除这些位置。</p>
+        <p>二分类可以输出 <code>[batch, 1]</code>，多标签分类可以输出 <code>[batch, classes]</code>。目标使用同形状的浮点张量，每个值位于 <code>[0,1]</code>。训练时把 logits 直接交给 <code>binary_cross_entropy_with_logits</code>，预测时再用 <code>sigmoid</code> 得到每个独立类别的概率。完整用法见<a href="../training.md#分类输出与损失">训练手册</a>。</p>
       </article>
 
       <article class="lesson" id="autograd" data-title="自动求导" data-description="计算图、链式法则、梯度累计与求导模式。">

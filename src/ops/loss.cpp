@@ -91,9 +91,32 @@ Tensor huber_loss(const Tensor& prediction, const Tensor& target, double delta, 
 }
 
 Tensor binary_cross_entropy_with_logits(const Tensor& logits, const Tensor& target, LossReduction reduction) {
-    // 两个 Softplus 分别表示负类别和正类别代价，无需先生成再取对数的概率。
-    auto losses = (1.0 - target) * softplus(logits) + target * softplus(-logits);
-    return reduce_loss(losses, reduction);
+    namespace numeric = detail::numeric;
+    const auto& x = detail::data_of(logits);
+    const auto& y = detail::data_of(target);
+    auto result = numeric::binary_logits(x, y);
+    const auto shape = result.layout.sizes;
+    const double factor = reduction == LossReduction::mean ? 1.0 / result.layout.numel() : 1.0;
+    if (reduction != LossReduction::none) {
+        result = numeric::sum(result, detail::all_axes(shape.size()), KeepDim::no);
+        if (reduction == LossReduction::mean) result = numeric::scale(result, factor);
+    }
+    // 只保存原始输入；反向将标量种子或逐项种子直接写入梯度目标。
+    return detail::record(std::move(result), {detail::gradient_edge(logits), detail::gradient_edge(target)},
+        [x, y, shape, factor](const auto& grad, auto& sink, const auto& edges) {
+            for (std::size_t i = 0; i < edges.size(); ++i) {
+                if (!sink.needs(edges[i])) continue;
+                const auto& input_shape = i == 0 ? x.layout.sizes : y.layout.sizes;
+                if (input_shape == shape) {
+                    auto output = sink.target(edges[i], shape, grad.dtype, grad.device());
+                    numeric::binary_logits_backward_into(output.value, grad, x, y, factor, i == 1, output.accumulate);
+                } else {
+                    auto contribution = detail::empty_data(shape, grad.dtype, grad.device());
+                    numeric::binary_logits_backward_into(contribution, grad, x, y, factor, i == 1, false);
+                    sink.add_reduced(edges[i], contribution, input_shape);
+                }
+            }
+        });
 }
 
 Tensor binary_cross_entropy(const Tensor& probability, const Tensor& target, LossReduction reduction) {

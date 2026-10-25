@@ -37,6 +37,11 @@ int main() {
         directional_check({1000.1, 999.7, 1000.4, -1000.2, -999.5, -1000.8}, {2, 3}, [](const auto& x) {
             return dl::cross_entropy(x, test::indices({0, 2}));
         });
+        directional_check({-12, -0.4, 0, 0.7, 3, 12}, {2, 3}, [](const auto& x) {
+            auto logits = x.transpose(0, 1);
+            auto targets = dl::sigmoid(logits * 0.1);
+            return dl::binary_cross_entropy_with_logits(logits, targets);
+        });
         directional_check({0.1, 0.3, -0.7, 0.4, 0.2, -0.1}, {2, 3}, [](const auto& x) {
             return dl::mean(dl::matmul(x, x.transpose(0, 1)));
         });

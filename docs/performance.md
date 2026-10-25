@@ -22,6 +22,37 @@
 
 复制、`clone()` 和 `astype()` 自动选择对应路径。低精度计算的输出、主参数、梯度和优化器状态使用 FP32。分块转置的访存方式可参考 [NVIDIA CUDA 最佳实践](https://docs.nvidia.com/cuda/cuda-c-best-practices-guide/index.html#shared-memory-in-matrix-multiplication-c-aat)。
 
+### 直接读取低精度存储
+
+两个输入都是 FP16 或都是 BF16 时，加、减、乘、除和幂运算直接读取 16 位元素，在寄存器中转成 FP32 后计算。输出和梯度仍为 FP32。这样省去两份完整的 FP32 输入副本，也省去对应的 CUDA 转换内核。
+
+CPU 与 CUDA 各自复用原有的二元遍历模板。连续输入、转置、切片和广播使用相同的运算公式，C++ 模板只选择存储类型与计算类型。不同精度的输入继续在数值入口统一类型，应用代码无需选择内部路径。
+
+例如，两个 `1024 × 1024` 的低精度张量相乘，输出占 4 MiB。直接读取输入后，这次运算的额外活跃显存从 12 MiB 降为 4 MiB，其中不包含调用前已经存在的输入。
+
+### 二分类损失的合并计算
+
+`binary_cross_entropy_with_logits` 同时用于二分类、多标签分类和逐像素分类。输入为分数 x 和目标 y，逐项损失为：
+
+<div data-tex="\max(x,0)-xy+\log(1+\exp(-|x|))" data-display="true"></div>
+
+前向一次遍历计算线性项与对数尾项，不生成两份 Softplus 结果和加权乘积。`log1p` 保留接近零的损失。反向从原始输入计算导数，直接写入梯度目标；平均损失的缩放也在这次遍历中完成，标量种子无需展开成完整张量。
+
+这类稳定表达式也用于 [PyTorch BCEWithLogitsLoss](https://docs.pytorch.org/docs/stable/generated/torch.nn.BCEWithLogitsLoss.html) 和 [TensorFlow sigmoid_cross_entropy_with_logits](https://www.tensorflow.org/api_docs/python/tf/nn/sigmoid_cross_entropy_with_logits)。Ctorch 保留 `none`、`sum`、`mean`、目标梯度和共享输入的梯度累计。
+
+下面比较二分类损失由基础算子组合和合并计算时的完整训练步耗时。MLP 使用 `256 → 256 → 64` 的两层 Linear，批量大小为 256。卷积网络使用 `3 → 16 → 16 → 4` 的三个卷积层，输入为 `[16, 3, 32, 32]`。两个网络均使用 ReLU、浮点软标签和 AdamW，计时包含清空梯度、前向、损失、反向及参数更新。
+
+测量设备为 NVIDIA GeForce RTX 5090 Laptop GPU，使用 CUDA 13.2 和 cuDNN 9.21。输入提前放入 GPU，每个进程预热 120 步，再测量 9 组，每组 60 步；宿主计时在每组边界等待 CUDA 完成。两种实现交替运行三轮，表中取各轮中位数的中位数。BF16 使用自动混合精度，参数、梯度和优化器状态保持 FP32。
+
+| 网络 | 计算精度 | 组合算子 / ms | 合并计算 / ms | 耗时降低 |
+| --- | --- | ---: | ---: | ---: |
+| MLP | FP32 | 0.3135 | 0.1844 | 41.2% |
+| MLP | BF16 | 0.3356 | 0.2085 | 37.9% |
+| 卷积网络 | FP32 | 0.4461 | 0.3339 | 25.2% |
+| 卷积网络 | BF16 | 0.6259 | 0.4956 | 20.8% |
+
+这两种小网络的二分类损失占用了较多算子调用。更大的网络或使用其他损失的训练，收益取决于相应计算在整个训练步中的占比。
+
 ### 归约中的线程协作
 
 求和、Softmax、归一化和交叉熵都需要合并多个线程的计算结果。CUDA 的一个线程束包含 32 个线程。Ctorch 将各线程的局部值写入共享内存，再由一个线程束按固定树形顺序合并。跨线程束的部分在寄存器中计算，最后 32 个值通过 shuffle 指令合并。

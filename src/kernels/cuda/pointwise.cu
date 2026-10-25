@@ -197,13 +197,13 @@ __global__ void add_relu_kernel(const T* a, const T* b, float* output, Index cou
     }
 }
 
-template <Binary Operation>
-__global__ void binary_kernel(const float* a, const float* b, float* output, Index count,
+template <Binary Operation, class T>
+__global__ void binary_kernel(const T* a, const T* b, float* output, Index count,
                                IndexMap left, IndexMap right) {
     for (Index index = static_cast<Index>(blockIdx.x) * blockDim.x + threadIdx.x;
          index < count; index += static_cast<Index>(blockDim.x) * gridDim.x) {
-        const float x = a[left.offset(index)];
-        const float y = b[right.offset(index)];
+        const float x = storage_cast<float>(a[left.offset(index)]);
+        const float y = storage_cast<float>(b[right.offset(index)]);
         if constexpr (Operation == Binary::add) output[index] = x + y;
         if constexpr (Operation == Binary::sub) output[index] = x - y;
         if constexpr (Operation == Binary::mul) output[index] = x * y;
@@ -214,14 +214,16 @@ __global__ void binary_kernel(const float* a, const float* b, float* output, Ind
 
 template <Binary Operation> TensorData binary(const TensorData& a, const TensorData& b) {
     auto shape = broadcast_shape(a.layout.sizes, b.layout.sizes);
-    auto result = empty_data(shape, a.dtype, a.device());
+    auto result = empty_data(shape, accumulation_dtype(a.dtype), a.device());
     const auto count = result.layout.numel();
     if (count != 0) {
         Execution execution(a);
-        binary_kernel<Operation><<<grid_size(count), block_size, 0, execution.stream()>>>(
-            a.data<float>(), b.data<float>(), result.mutable_data<float>(), count,
-            IndexMap(shape, broadcast_strides(a.layout, shape)),
-            IndexMap(shape, broadcast_strides(b.layout, shape)));
+        visit_storage(a.dtype, [&]<class T> {
+            binary_kernel<Operation><<<grid_size(count), block_size, 0, execution.stream()>>>(
+                a.data<T>(), b.data<T>(), result.mutable_data<float>(), count,
+                IndexMap(shape, broadcast_strides(a.layout, shape)),
+                IndexMap(shape, broadcast_strides(b.layout, shape)));
+        });
         check(cudaGetLastError());
     }
     return result;

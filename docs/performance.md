@@ -285,6 +285,8 @@ Ctorch 保留独立输出与原地更新的接口区别。原地累计可以读�
 
 [框架结果对比](projects/comparison.md#cpu-前向耗时)同时列出普通分配、启用缓冲复用、PyTorch 和 TensorFlow 的结果。[比较程序](../examples/comparison/README.md)提供复现命令。缓冲复用效果取决于模型的临时张量数量、大小和系统分配器。
 
+[多维性能比较](projects/performance.md)提供 CUDA 与 CPU 的算子、推理、完整训练、显存和首次调用测量，并分别列出 PyTorch 的融合、编译、推理权重缓存及 TensorFlow 图执行配置。
+
 相关实现方式可参考 [PyTorch 的 CPU 逐元素循环](https://github.com/pytorch/pytorch/blob/main/aten/src/ATen/native/cpu/Loops.h)和 [Eigen 的表达式求值与临时结果](https://libeigen.gitlab.io/eigen/docs-nightly/TopicLazyEvaluation.html)。
 
 GELU 的实现还可参考 [PyTorch CPU 激活函数](https://github.com/pytorch/pytorch/blob/main/aten/src/ATen/native/cpu/Activation.cpp)。

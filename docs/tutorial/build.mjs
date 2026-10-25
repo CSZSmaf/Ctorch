@@ -11,6 +11,7 @@ const katex = require("katex");
 const { Marked } = await import(pathToFileURL(require.resolve("marked")));
 const template = await readFile(join(source, "reader.html"), "utf8");
 const pages = new Map();
+const images = new Map();
 const sections = {
   tutorial: { title: "教程", pages: [
     ["docs/tutorial/index.html", "课程目录"],
@@ -22,6 +23,7 @@ const sections = {
     ["docs/projects/resnet.md", "CIFAR-10：ResNet-20"],
     ["docs/projects/transformer.md", "Shakespeare：Transformer"],
     ["docs/projects/comparison.md", "框架结果对比"],
+    ["docs/projects/performance.md", "多维性能比较"],
   ] },
   manual: { title: "手册", pages: [
     ["docs/README.md", "手册目录"],
@@ -75,6 +77,13 @@ function link(file, page, href) {
   const [path, fragment = ""] = href.split("#");
   const target = posix.normalize(posix.join(posix.dirname(file), decodeURI(path)));
   return relative(page, route(target)) + (fragment ? `#${fragment}` : "");
+}
+function image(file, page, href) {
+  if (/^(?:[a-z]+:|\/)/i.test(href)) return href;
+  const target = posix.normalize(posix.join(posix.dirname(file), decodeURI(href)));
+  const output = `assets/${target}`;
+  images.set(target, output);
+  return relative(page, output);
 }
 async function save(file, content) {
   const target = join(destination, file);
@@ -156,6 +165,9 @@ for (const [file, page] of pages) {
       link({ href, title, tokens }) {
         return `<a href="${escape(link(file, page, href))}"${title ? ` title="${escape(title)}"` : ""}>${this.parser.parseInline(tokens)}</a>`;
       },
+      image({ href, title, text }) {
+        return `<img src="${escape(image(file, page, href))}" alt="${escape(text)}"${title ? ` title="${escape(title)}"` : ""} loading="lazy" style="max-width:100%;height:auto">`;
+      },
       code({ text, lang = "text" }) {
         const language = ({ cpp: "C++", c: "C17", cmake: "CMake", bash: "Shell", sh: "Shell" })[lang] || lang;
         return `<pre data-language="${escape(language)}"><code>${escape(text)}</code></pre>\n`;
@@ -173,5 +185,9 @@ for (const [file, page] of pages) {
 <pre data-language="${language}"><code>${escape(text)}</code></pre>`;
     await save(page, reader(file, page, title, body));
   }
+}
+for (const [file, output] of images) {
+  await mkdir(dirname(join(destination, output)), { recursive: true });
+  await copyFile(join(root, file), join(destination, output));
 }
 console.log(`Generated ${new Set(["index.html", ...pages.values()]).size} pages in ${destination}`);

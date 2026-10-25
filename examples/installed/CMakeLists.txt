@@ -3,9 +3,9 @@ project(CtorchInstalledExamples LANGUAGES C CXX)
 
 option(CTORCH_INSTALLED_NPU_EXAMPLES "Build the optional NPU C/C++ consumers" OFF)
 if(CTORCH_INSTALLED_NPU_EXAMPLES)
-    find_package(Ctorch 0.1 CONFIG REQUIRED COMPONENTS npu)
+    find_package(Ctorch 0.2 CONFIG REQUIRED COMPONENTS npu)
 else()
-    find_package(Ctorch 0.1 CONFIG REQUIRED)
+    find_package(Ctorch 0.2 CONFIG REQUIRED)
 endif()
 
 include(../targets.cmake)

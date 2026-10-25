@@ -51,7 +51,7 @@ cmake --install ../Ctorch-build/cpu --prefix ../Ctorch-install
 ```cmake
 cmake_minimum_required(VERSION 3.24)
 project(MyModel LANGUAGES C CXX)
-find_package(Ctorch 0.1 CONFIG REQUIRED)
+find_package(Ctorch 0.2 CONFIG REQUIRED)
 add_executable(model main.cpp)
 target_link_libraries(model PRIVATE ctorch::ctorch)
 ```

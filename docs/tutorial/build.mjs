@@ -97,6 +97,7 @@ function reader(file, page, title, body, headings = []) {
     ? section.pages : [...section.pages, [file, title]];
   const values = {
     TITLE: escape(title), PAGE: page, ROOT: prefix, CONTENT: math(body),
+    LICENSE: relative(page, route("LICENSE")),
     SECTION: section.title,
     SECTION_HOME: relative(page, route(section.pages[0][0])),
     TOP_NAVIGATION: Object.values(sections).map(item =>
@@ -118,6 +119,10 @@ await copyFile(join(katexRoot, "dist/katex.min.css"), join(destination, "assets/
 await copyFile(join(katexRoot, "LICENSE"), join(destination, "assets/katex/LICENSE"));
 for (const file of ["style.css", "interface.js", "tutorial.js", "comparison-data.js", "comparison.js"]) {
   await copyFile(join(source, file), join(destination, file));
+}
+for (const file of ["LICENSE", "COPYRIGHT"]) {
+  await copyFile(join(root, file), join(destination, file));
+  route(file);
 }
 
 const main = "docs/tutorial/index.html";
@@ -160,7 +165,8 @@ for (const [file, page] of pages) {
     await save(page, reader(file, page, title, body, headings));
   } else {
     const title = posix.basename(file);
-    const language = file.endsWith(".py") ? "Python" : file.endsWith(".c") ? "C17" : "C++";
+    const language = file.endsWith(".py") ? "Python" : file.endsWith(".c") ? "C17"
+      : /\.(cpp|h)$/.test(file) ? "C++" : "Text";
     const download = `downloads/${file}`;
     await save(download, text);
     const body = `<h1>${title}</h1><p><a href="${relative(page, download)}" download>下载 ${title}</a></p>

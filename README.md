@@ -69,6 +69,6 @@ ctest --test-dir ../Ctorch-build/cpu --output-on-failure
 
 框架面向单机稠密训练。一阶求导、显式设备与精度选择构成基础接口；分布式训练、高阶求导、稀疏训练和通用 JIT 不在当前接口范围内。
 
-## 版权
+## 版权与许可
 
-Copyright © 2026 [CSZSmaf](https://github.com/CSZSmaf)。版权所有，详见 [版权声明](COPYRIGHT)。第三方组件遵循各自的许可证。
+Copyright © 2026 [CSZSmaf](https://github.com/CSZSmaf)。项目采用 [Apache-2.0](LICENSE)，署名与适用范围见 [版权声明](COPYRIGHT)。第三方组件遵循各自的许可证。

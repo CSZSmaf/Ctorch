@@ -63,6 +63,7 @@ input[type="checkbox"] { accent-color: var(--accent); width: 17px; height: 17px;
 .brand-mark { width: 30px; height: 32px; font-size: 27px; line-height: 30px; color: var(--accent-bright); letter-spacing: -5px; font-weight: 750; }
 .brand-mark span { color: var(--ink); }
 .brand-section { margin-left: 4px; color: var(--muted); font-size: 15px; font-weight: 400; letter-spacing: 0; }
+.home-link { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; color: var(--ink); font-size: 14px; text-decoration: none; white-space: nowrap; }
 .top-links { display: flex; gap: 28px; height: 100%; align-items: center; }
 .top-links a { color: var(--muted); text-decoration: none; font-size: 14px; height: 100%; display: flex; align-items: center; border-bottom: 2px solid transparent; }
 .top-links a.current { color: var(--ink); border-color: var(--accent-bright); }
@@ -252,6 +253,7 @@ dialog::backdrop { background: #111d2c66; backdrop-filter: blur(3px); }
   .site-header { gap: 30px; padding: 0 24px; }
   .top-links { gap: 22px; }
   .github-link { display: none; }
+  .search-label, .search-trigger kbd { display: none; }
 }
 @media (max-width: 800px) {
   .site-header { height: 64px; gap: 14px; padding: 0 18px; }
@@ -282,6 +284,7 @@ dialog::backdrop { background: #111d2c66; backdrop-filter: blur(3px); }
   .site-header { padding: 0 14px; gap: 10px; }
   .brand { gap: 6px; }
   .brand-section { display: none; }
+  .home-name { display: none; }
   h1 { font-size: 28px; }
   .lab { padding: 16px; }
   .lab-heading { margin-bottom: 20px; }

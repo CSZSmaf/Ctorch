@@ -227,7 +227,7 @@ install(FILES "${CMAKE_CURRENT_BINARY_DIR}/include/dl/export.h"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/dl"
 )
 install(EXPORT CtorchTargets NAMESPACE ctorch:: DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/Ctorch")
-install(FILES COPYRIGHT DESTINATION "${CMAKE_INSTALL_DATADIR}/licenses/Ctorch")
+install(FILES COPYRIGHT LICENSE DESTINATION "${CMAKE_INSTALL_DATADIR}/licenses/Ctorch")
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/CtorchConfig.cmake"
               "${CMAKE_CURRENT_BINARY_DIR}/CtorchConfigVersion.cmake"
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/Ctorch"

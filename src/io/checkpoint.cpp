@@ -3,6 +3,7 @@
 #include "core/tensor_impl.h"
 #include "ops/numeric.h"
 #include "io/archive.h"
+#include "io/output_file.h"
 
 #include <algorithm>
 #include <array>
@@ -97,12 +98,11 @@ StateDict read_state(std::istream& input) {
 } // namespace archive
 
 void save(const std::filesystem::path& path, std::span<const NamedTensor> state) {
-    std::ofstream output;
-    output.exceptions(std::ios::failbit | std::ios::badbit);
-    output.open(path, std::ios::binary | std::ios::trunc);
+    archive::OutputFile file(path);
+    auto& output = file.stream();
     output.write(format.data(), format.size());
     archive::write_state(output, state);
-    output.close();
+    file.commit();
 }
 
 StateDict load(const std::filesystem::path& path) {

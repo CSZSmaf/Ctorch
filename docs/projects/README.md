@@ -8,6 +8,7 @@
 | [MNIST LeNet](mnist.md#lenet) | 手写数字分类 | 44,426 | 卷积、池化、特征尺寸计算 |
 | [CIFAR-10 ResNet-20](resnet.md) | 彩色图像分类 | 272,474 | 残差模块、BatchNorm、分阶段降采样 |
 | [Shakespeare Transformer](transformer.md) | 下一个字节预测与文本生成 | 842,496 | 因果注意力、共享词表、梯度裁剪、自回归生成 |
+| [字节解码器](decoder.md) | 下一字节预测与缓存生成 | 139,584 | RoPE、SwiGLU、分组查询、KV 缓存和恢复训练 |
 | [二值图像分割](segmentation.md) | 带噪声圆形图像的逐像素分类 | 777 | 跳跃连接、Dice、IoU 和 EMA |
 | [变长文本分类](variable-length.md) | TSV 文本与整数标签 | 随类别数变化 | 序列填充、mask、长度分桶和后台整理 |
 

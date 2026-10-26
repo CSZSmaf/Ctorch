@@ -4,6 +4,7 @@
 #include "ops/numeric.h"
 
 #include <algorithm>
+#include <stdexcept>
 
 namespace dl {
 namespace {
@@ -50,6 +51,7 @@ std::vector<NodeTask> topological_order(std::span<const Edge> roots) {
         if (expanded) {
             order.push_back({std::move(node)});
         } else if (visited.insert(node.get()).second) {
+            if (node->consumed) throw std::logic_error("backward graph has already been consumed; run a new forward pass");
             pending.emplace_back(node, true);
             for (const auto& input : node->inputs) {
                 if (input.node) {

@@ -13,6 +13,7 @@
 namespace dl::io {
 
 /// 保存名称、dtype、shape 与连续张量值；模型结构由调用方的 C++ 类型表达。
+/// 先写同目录的临时文件，关闭后替换目标；写入失败时保留原目标文件。
 DL_API void save(const std::filesystem::path& path, std::span<const NamedTensor> state);
 DL_API StateDict load(const std::filesystem::path& path);
 
@@ -67,7 +68,8 @@ DL_API TrainingCheckpoint capture_checkpoint(const nn::Module& model, const opti
 /// 模型先迁移到目标设备，再构造优化器；参数集合相同，列表顺序可以不同。
 /// 带采样器的快照对应一个 loader，各额外生成器由保存时的名称关联。
 /// 各调度器先绑定当前优化器，再按名称恢复；参数组及学习率一起恢复。
-/// 传入 scaler 时恢复快照中的缩放状态；旧快照没有此状态时保留调用方的初始配置。
+/// 快照含 loader 或 scaler 时传入对应对象，额外生成器与调度器的名称集合与快照相同。
+/// 旧快照没有 scaler 状态时保留调用方的初始配置。
 /// v5 同时恢复参数冻结状态；v1-v4 保留调用方的 requires_grad 选择。
 DL_API TrainingProgress restore_checkpoint(const TrainingCheckpoint& checkpoint, nn::Module& model,
     optim::Optimizer& optimizer, data::DataLoader* loader = nullptr,

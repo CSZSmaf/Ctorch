@@ -22,7 +22,7 @@ public:
         // 普通 VJP 只读借用；传递节点可接收所有权，并由 GradSink 处理结果捕获造成的共享。
         (*function_)(std::move(grad), sink, inputs);
     }
-    void release_saved() override { function_.reset(); }
+    void release_saved() override { function_.reset(); consumed = true; }
 
 private:
     std::optional<Function> function_;

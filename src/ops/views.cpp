@@ -4,6 +4,7 @@
 #include "ops/numeric.h"
 
 #include <algorithm>
+#include <stdexcept>
 
 namespace dl::detail::numeric {
 
@@ -122,6 +123,7 @@ Tensor Tensor::view(Shape shape) const {
     shape = detail::resolve_shape(std::move(shape), numel());
     auto data = detail::data_of(*this);
     auto strides = detail::reshape_strides(data.layout, shape);
+    if (!strides) throw std::invalid_argument("view cannot represent this layout; use reshape to copy the logical values");
     data.layout = {std::move(shape), std::move(*strides), data.layout.offset};
     return shape_result(std::move(data), *this);
 }

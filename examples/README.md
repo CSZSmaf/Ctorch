@@ -18,6 +18,8 @@ cmake --build --preset cpu
 | ctorch_byte_transformer | 本地文本文件 | 字节/位置 Embedding、因果 Transformer、共享词表权重 |
 | ctorch_shakespeare_transformer | 本地文本文件 | 4 层、宽度 128、上下文 128 的 Transformer |
 | ctorch_text_generate | 文本模型权重与前缀 | 自回归字节采样 |
+| ctorch_decoder_train | 本地文本文件 | 两层 RoPE / GQA / SwiGLU 字节解码器 |
+| ctorch_decoder_generate | 解码器权重与前缀 | 使用 KV 缓存的贪心字节生成 |
 | ctorch_variable_length | 训练与验证 TSV 文件 | 字节 Embedding、带 mask 的平均池化与分类 |
 
 [二值分割示例](../docs/projects/segmentation.md)使用程序生成的带噪声图像，运行 `ctorch_segmentation <output-directory> [cpu|cuda]`。它演示分割损失、IoU、EMA 和训练工具状态保存。
@@ -29,6 +31,8 @@ ctorch_byte_transformer <text-file> <output-directory> [--device cpu|index] [--s
 ```
 
 训练支持 `--precision f32|bf16|f16`，默认 f32；文本模型另接受 `--attention math|cudnn`，默认 math。cuDNN 注意力需要对应后端、CUDA 设备及 f16/bf16 精度。`--stop-after N` 控制更新次数，`--resume <checkpoint>` 用于从训练状态恢复，具体参数由各入口的 usage 说明给出。
+
+字节解码器使用 `math` 注意力路径。训练、恢复与缓存生成命令见[解码器项目](../docs/projects/decoder.md)，LoRA 和分组查询的接口见[手册](../docs/decoder.md)。
 
 MNIST 目录包含标准解压文件名，像素缩放到 `[0,1]`。训练集前 55,000 个样本用于更新，后 5,000 个用于验证，官方测试集用于最终评估。
 

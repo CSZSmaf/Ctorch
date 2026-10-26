@@ -1,4 +1,5 @@
 #include <dl/c_api.h>
+#include <dl/decoder_c_api.h>
 #include <math.h>
 #include <stdio.h>
 
@@ -23,6 +24,22 @@ int main(void) {
     dl_tensor_release(seed);
     dl_tensor_release(square);
     dl_tensor_release(input);
+
+    dl_module* decoder;
+    dl_decoder_cache* cache;
+    OK(dl_transformer_decoder_create(1, 8, 4, 2, 12, 16, options, &decoder));
+    OK(dl_decoder_cache_create(decoder, &cache));
+    const int64_t sequence_dims[] = {1, 2, 8};
+    OK(dl_ones((dl_shape){sequence_dims, 3}, options, &input));
+    OK(dl_transformer_decoder_decode(decoder, input, cache, &square));
+    int64_t length;
+    OK(dl_decoder_cache_length(cache, &length));
+    if (length != 2) return 1;
+    OK(dl_decoder_cache_clear(cache));
+    dl_tensor_release(square);
+    dl_tensor_release(input);
+    dl_decoder_cache_release(cache);
+    dl_module_release(decoder);
 
     options.requires_grad = 0;
     OK(dl_from_host(values, (dl_shape){dims, 1}, options, &input));

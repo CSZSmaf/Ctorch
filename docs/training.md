@@ -6,6 +6,8 @@
 
 常用层包括 Linear、Conv1d/2d、固定与自适应池化、Upsample、BatchNorm、GroupNorm、LayerNorm、RMSNorm、Embedding、Dropout、RNN/GRU/LSTM、MultiHeadAttention 和 TransformerEncoder。自定义模块通过普通 C++ 运算组合已有层，见 [custom_layer.cpp](../examples/custom_layer.cpp)。
 
+因果解码器、RoPE、SwiGLU、分组查询和 LoRA 的组合及用法见[解码器与低秩微调](decoder.md)。生成缓存由请求单独持有，训练仍使用普通前向与反向接口。
+
 带参数的层在构造时使用 `register_parameter` 登记，在前向中通过 `bound(parameter)` 读取当前绑定；buffer 对应 `register_buffer` 和 `bound_buffer`。这样同一个前向既能使用模块自身状态，也能使用 `FunctionalModule` 提供的独立状态。完整模板见 [parameter_layer.cpp](../examples/parameter_layer.cpp)。
 
 参数、buffer 与子模块共用本层名称空间，名称非空、不含点且唯一。`dl::summary(model)` 展示模块路径、参数量、冻结状态和共享关系；`dl::describe(tensor)` 展示布局与设备等元信息，不读取设备数值。
@@ -70,5 +72,9 @@ cuDNN 低精度卷积先按选定的 16 位格式写回，再展开为 FP32。�
 共享张量采用全部登记路径中字典序最小的规范名，参数槽仍保留首次遇到该身份的顺序。快照按名称恢复模型与优化器状态，支持名称集合相同、登记次序不同的模块树；旧检查点中仍存在于当前树的共享别名也可加载。`state_aliases()` 提供别名到规范名的对应。路径改名由应用明确迁移。
 
 保存和恢复安排在更新边界；微批窗口内的中间反向图不写入文件。
+
+权重和训练文件先写入同目录临时文件，关闭后替换目标。写入或替换失败时保留旧文件，临时文件由保存操作清理。
+
+完整恢复时，提供快照中的 loader、scaler 以及同名生成器和调度器。恢复入口先检查这些对象与优化器类型，再修改模型。`load_state_dict` 在复制前核对全部目标张量的形状、dtype 和可写性。只需模型权重时，使用 `io::load` 与 `model.load_state_dict`。
 
 真实训练示例共用训练、验证、最佳模型选择和恢复逻辑，命令见[示例说明](../examples/README.md)。

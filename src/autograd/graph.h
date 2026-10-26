@@ -70,6 +70,7 @@ struct Node {
     virtual void release_saved() = 0;
 
     std::vector<Edge> inputs;
+    bool consumed = false;
 };
 
 struct AutogradMeta {

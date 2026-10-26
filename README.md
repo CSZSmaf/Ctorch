@@ -12,6 +12,7 @@ Release 提供对应版本的源码和教程压缩包。源码包使用本地编
 
 - 动态形状、共享存储视图、广播、索引和一阶反向自动求导。
 - Linear、分组卷积、池化、归一化、Embedding、RNN/GRU/LSTM 与 Transformer。
+- RoPE、SwiGLU、分组查询解码器、独立 KV 缓存与 LoRA 低秩微调。
 - SGD、Adam、AdamW、RMSprop、Adagrad，参数分组、冻结、裁剪与学习率调度。
 - 后台批次整理、变长序列、分桶与加权采样、输入预取和完整训练状态保存。
 - 加权交叉熵、Focal/Dice/KL 损失、分类与分割指标、早停和 EMA。
@@ -53,6 +54,7 @@ auto gradient = *x.grad();
 | [架构](docs/architecture.md) | 张量、求导、数值层与后端职责 |
 | [张量与梯度](docs/tensors.md) | 类型、布局、别名、算子和梯度生命周期 |
 | [训练](docs/training.md) | 模块、优化器、数据、精度和保存恢复 |
+| [解码器与微调](docs/decoder.md) | RoPE、SwiGLU、GQA、KV 缓存与 LoRA |
 | [数据加载](docs/data.md) | 多输入、变长序列、后台预取与采样 |
 | [损失函数](docs/objectives.md) | 类别权重、标签平滑、分割与蒸馏 |
 | [训练控制](docs/training-tools.md) | 早停、平台期调度、EMA 与评价指标 |

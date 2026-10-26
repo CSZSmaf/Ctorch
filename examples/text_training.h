@@ -8,6 +8,7 @@
 
 namespace examples {
 
+template <class Model = ByteTransformer>
 inline int train_text(int argc, char** argv, TextModelOptions config = {}) {
     if (argc < 3 || argc % 2 == 0) {
         std::cerr << "usage: " << argv[0] << " <local-text-file> <output-directory>"
@@ -35,7 +36,7 @@ inline int train_text(int argc, char** argv, TextModelOptions config = {}) {
     dl::data::DataLoader validation(validation_data.size(), validation_data,
         {.batch_size = 32, .shuffle = false}, evaluation_sampler);
     dl::manual_seed(42);
-    ByteTransformer model(config);
+    Model model(config);
     model.to(options.device);
     dl::optim::AdamW optimizer(model.parameters(), {.learning_rate = 0.001});
     TrainingState state;

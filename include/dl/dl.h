@@ -4,6 +4,7 @@
 #include "dl/autograd.h"
 #include "dl/cuda.h"
 #include "dl/data.h"
+#include "dl/decoder.h"
 #include "dl/extension.h"
 #include "dl/functional.h"
 #include "dl/io.h"

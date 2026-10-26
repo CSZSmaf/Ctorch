@@ -47,6 +47,7 @@ add_library(ctorch
     src/ops/reduction.cpp
     src/ops/statistics.cpp
     src/ops/sequence.cpp
+    src/ops/contraction.cpp
     src/ops/matmul.cpp
     src/ops/indexing.cpp
     src/ops/concatenation.cpp
@@ -81,6 +82,8 @@ add_library(ctorch
     src/nn/spatial.cpp
     src/nn/recurrent.cpp
     src/nn/attention.cpp
+    src/nn/decoder.cpp
+    src/nn/kv_cache.cpp
     src/optim/optimizer.cpp
     src/optim/update.cpp
     src/optim/functional.cpp
@@ -95,6 +98,7 @@ add_library(ctorch
     src/training/controls.cpp
     src/training/metrics.cpp
     src/io/checkpoint.cpp
+    src/io/output_file.cpp
     src/io/training.cpp
     src/io/training_state.cpp
     src/io/optimizer.cpp
@@ -114,6 +118,7 @@ add_library(ctorch
     src/api/optimizer.cpp
     src/api/scheduler.cpp
     src/api/module.cpp
+    src/api/decoder.cpp
     src/api/functional.cpp
     src/api/state.cpp
 )

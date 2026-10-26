@@ -2,6 +2,12 @@
 
 int main() {
     return test::run([] {
+        auto matrix = dl::arange(6).reshape({2, 3});
+        bool bad_shape = false, bad_view = false;
+        try { matrix.reshape({-1, -1}); } catch (const std::invalid_argument&) { bad_shape = true; }
+        try { matrix.transpose(0, 1).view({6}); } catch (const std::invalid_argument&) { bad_view = true; }
+        test::expect(bad_shape && bad_view, "reshape and view report incompatible shapes");
+        test::values(matrix.transpose(0, 1).reshape({6}), {0, 3, 1, 4, 2, 5});
         auto sequence = test::tensor({3, 1, 1, 2, 4, -1}, {2, 3}, true);
         auto sorted = dl::sort(sequence, 1);
         test::values(sorted.values, {1, 1, 3, -1, 2, 4});

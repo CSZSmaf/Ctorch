@@ -51,6 +51,23 @@ void legacy_names(dl::io::TrainingCheckpoint& state) {
 
 int main() {
     return test::run([] {
+        dl::manual_seed(17);
+        dl::nn::TransformerDecoder decoder(2, 8, 4, 2, 12, 16, {.dtype = dl::DType::f64});
+        auto input = dl::arange(48, {.dtype = dl::DType::f64}).reshape({1, 6, 8}) / 48.0;
+        auto full = decoder(input);
+        auto cache = decoder.make_cache();
+        auto prefix = decoder.decode(input.narrow(1, 0, 2), cache);
+        auto suffix = decoder.decode(input.narrow(1, 2, 4), cache);
+        auto cached = dl::concat({prefix, suffix}, 1).to_vector<double>();
+        auto expected_full = full.to_vector<double>();
+        for (std::size_t i = 0; i < cached.size(); ++i) test::close(cached[i], expected_full[i]);
+        for (auto& layer : cache) layer.truncate(2);
+        test::expect(cache.front().length() == 2, "cache keeps an existing prefix");
+        dl::nn::Linear base(3, 2, false, {.dtype = dl::DType::f64});
+        dl::nn::LoRALinear adapter(base, 2, 4);
+        auto adapted = adapter(test::tensor({1, 2, 3}, {1, 3}));
+        test::close(dl::sum(adapted).item<double>(),
+            dl::sum((*adapter.merged())(test::tensor({1, 2, 3}, {1, 3}))).item<double>());
         dl::Generator data_random(19);
         dl::data::DataLoader data({dl::arange(7), dl::arange(7)}, {.batch_size = 2, .shuffle = false}, data_random);
         dl::data::PrefetchLoader pipeline(data, dl::Device::cpu(), 2, true);

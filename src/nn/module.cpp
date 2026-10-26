@@ -142,6 +142,8 @@ void Module::load_state_dict(std::span<const NamedTensor> state) {
     values.reserve(destination.size());
     for (const auto& [name, tensor] : destination) {
         const auto& value = detail::data_of(*source.at(name));
+        if (tensor.shape() != value.layout.sizes || tensor.dtype() != value.dtype || tensor.is_read_only())
+            throw std::invalid_argument("state tensor shape, dtype or write access differs: " + name);
         values.push_back(target_storage.contains(value.storage.get()) ? detail::numeric::clone(value) : value);
     }
     for (std::size_t index = 0; index < destination.size(); ++index) {

@@ -3,6 +3,9 @@
 #include <algorithm>
 #include <functional>
 #include <numeric>
+#include <limits>
+#include <stdexcept>
+#include <string>
 #include <utility>
 
 namespace dl::detail {
@@ -26,13 +29,21 @@ Shape resolve_shape(Shape shape, Index count) {
     Index known = 1;
     for (std::size_t dim = 0; dim < shape.size(); ++dim) {
         if (shape[dim] == -1) {
+            if (inferred >= 0) throw std::invalid_argument("reshape accepts one inferred dimension");
             inferred = static_cast<Index>(dim);
         } else {
+            if (shape[dim] < 0) throw std::invalid_argument("reshape dimensions must be nonnegative or -1");
+            if (shape[dim] && known > std::numeric_limits<Index>::max() / shape[dim])
+                throw std::overflow_error("reshape element count exceeds Index range");
             known *= shape[dim];
         }
     }
     if (inferred >= 0) {
+        if (known == 0 || count % known != 0)
+            throw std::invalid_argument("reshape cannot infer an integral dimension");
         shape[static_cast<std::size_t>(inferred)] = count / known;
+    } else if (known != count) {
+        throw std::invalid_argument("reshape must preserve the element count");
     }
     return shape;
 }
@@ -42,6 +53,8 @@ Shape broadcast_shape(std::span<const Index> a, std::span<const Index> b) {
     for (std::size_t trailing = 0; trailing < shape.size(); ++trailing) {
         const Index left = trailing < a.size() ? a[a.size() - 1 - trailing] : 1;
         const Index right = trailing < b.size() ? b[b.size() - 1 - trailing] : 1;
+        if (left != right && left != 1 && right != 1)
+            throw std::invalid_argument("incompatible broadcast dimensions: " + std::to_string(left) + " and " + std::to_string(right));
         shape[shape.size() - 1 - trailing] = left == 1 ? right : left;
     }
     return shape;

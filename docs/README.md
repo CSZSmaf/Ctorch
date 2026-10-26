@@ -8,6 +8,7 @@
 | [张量与梯度](tensors.md) | 数据类型、设备、视图、算子与反向传播 |
 | [从 PyTorch 迁移](migration.md) | 接口对应、参数绑定、注意力、状态与数值对齐 |
 | [模型与训练](training.md) | 模块、优化器、数据加载、混合精度和检查点 |
+| [解码器与低秩微调](decoder.md) | RoPE、SwiGLU、GQA、KV 缓存和 LoRA |
 | [数据加载](data.md) | 多输入批次、变长序列、后台预取和采样 |
 | [损失函数](objectives.md) | 类别权重、标签平滑、分割损失和 KL 散度 |
 | [训练控制](training-tools.md) | 早停、平台期调度、EMA 和评价指标 |

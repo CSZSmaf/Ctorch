@@ -3,6 +3,7 @@
 #include "core/tensor_impl.h"
 #include "io/archive.h"
 #include "io/training_archive.h"
+#include "io/output_file.h"
 #include "nn/state_names.h"
 
 #include <algorithm>
@@ -145,6 +146,22 @@ void restore_runtime(const TrainingCheckpoint& checkpoint, data::DataLoader* loa
     default_generator().load_state(checkpoint.random_state);
 }
 
+void require_runtime(const TrainingCheckpoint& checkpoint, const data::DataLoader* loader,
+    std::span<const NamedGenerator> generators, std::span<const NamedScheduler> schedulers, const GradScaler* scaler) {
+    if (checkpoint.loader && !loader) throw std::invalid_argument("checkpoint restoration requires its data loader");
+    if (checkpoint.scaler && !scaler) throw std::invalid_argument("checkpoint restoration requires its gradient scaler");
+    auto same_names = [](const auto& saved, const auto& supplied, const char* kind) {
+        std::vector<std::string_view> expected, actual;
+        for (const auto& entry : saved) expected.push_back(entry.first);
+        for (const auto& entry : supplied) actual.push_back(entry.name);
+        std::sort(expected.begin(), expected.end());
+        std::sort(actual.begin(), actual.end());
+        if (expected != actual) throw std::invalid_argument(std::string("checkpoint ") + kind + " names differ");
+    };
+    same_names(checkpoint.generators, generators, "generator");
+    same_names(checkpoint.schedulers, schedulers, "scheduler");
+}
+
 } // namespace
 
 TrainingCheckpoint capture_checkpoint(const nn::Module& model, const optim::Optimizer& optimizer,
@@ -163,12 +180,17 @@ TrainingCheckpoint capture_checkpoint(const nn::Module& model, const optim::Opti
 TrainingProgress restore_checkpoint(const TrainingCheckpoint& checkpoint, nn::Module& model,
     optim::Optimizer& optimizer, data::DataLoader* loader, std::span<const NamedGenerator> generators,
     std::span<const NamedScheduler> schedulers, GradScaler* scaler) {
+    require_runtime(checkpoint, loader, generators, schedulers, scaler);
+    if (checkpoint.optimizer.index() != optimizer.state_dict().index())
+        throw std::invalid_argument("checkpoint optimizer type differs");
+    const auto names = parameter_names(model, optimizer);
+    const auto source_names = nn::state_detail::canonical_names(checkpoint.optimizer_parameters, model.state_aliases());
+    if (source_names.size() != names.size()) throw std::invalid_argument("checkpoint optimizer parameter counts differ");
+    auto optimizer_state = archive::reorder_optimizer(checkpoint.optimizer, source_names, names);
     model.load_state_dict(checkpoint.model);
     model.load_training_modes(checkpoint.modes);
     if (checkpoint.gradient_modes) model.load_gradient_modes(*checkpoint.gradient_modes);
-    const auto names = parameter_names(model, optimizer);
-    const auto source_names = nn::state_detail::canonical_names(checkpoint.optimizer_parameters, model.state_aliases());
-    optimizer.load_state_dict(archive::reorder_optimizer(checkpoint.optimizer, source_names, names));
+    optimizer.load_state_dict(optimizer_state);
     for (const auto& parameter : model.parameters()) parameter.zero_grad();
     restore_runtime(checkpoint, loader, generators, schedulers, scaler);
     return checkpoint.progress;
@@ -202,6 +224,7 @@ TrainingCheckpoint capture_checkpoint(const nn::FunctionalModule& functional, co
 FunctionalTrainingState restore_checkpoint(const TrainingCheckpoint& checkpoint,
     const nn::FunctionalModule& functional, Device device, data::DataLoader* loader,
     std::span<const NamedGenerator> generators, GradScaler* scaler) {
+    require_runtime(checkpoint, loader, generators, {}, scaler);
     FunctionalTrainingState result{{}, {}, checkpoint.random_key.value(), checkpoint.progress};
     std::unordered_map<std::string_view, const Tensor*> values;
     for (const auto& [name, tensor] : checkpoint.model) values.emplace(name, &tensor);
@@ -241,6 +264,7 @@ TrainingCheckpoint capture_checkpoint(const nn::Module& model, const optim::Opti
 TrainingProgress restore_checkpoint(const TrainingCheckpoint& checkpoint, nn::Module& model,
     optim::Optimizer& optimizer, data::PrefetchLoader& loader, std::span<const NamedGenerator> generators,
     std::span<const NamedScheduler> schedulers, GradScaler* scaler) {
+    require_runtime(checkpoint, &loader.source(), generators, schedulers, scaler);
     loader.load_state_dict(checkpoint.prefetch.value_or(data::PrefetchState{}));
     auto progress = restore_checkpoint(checkpoint, model, optimizer, &loader.source(), generators, schedulers, scaler);
     return progress;
@@ -258,6 +282,7 @@ TrainingCheckpoint capture_checkpoint(const nn::FunctionalModule& functional, co
 FunctionalTrainingState restore_checkpoint(const TrainingCheckpoint& checkpoint,
     const nn::FunctionalModule& functional, Device device, data::PrefetchLoader& loader,
     std::span<const NamedGenerator> generators, GradScaler* scaler) {
+    require_runtime(checkpoint, &loader.source(), generators, {}, scaler);
     loader.load_state_dict(checkpoint.prefetch.value_or(data::PrefetchState{}));
     auto result = restore_checkpoint(checkpoint, functional, device, &loader.source(), generators, scaler);
     return result;
@@ -265,9 +290,8 @@ FunctionalTrainingState restore_checkpoint(const TrainingCheckpoint& checkpoint,
 
 void save_checkpoint(const std::filesystem::path& path, const TrainingCheckpoint& checkpoint) {
     using namespace archive;
-    std::ofstream output;
-    output.exceptions(std::ios::failbit | std::ios::badbit);
-    output.open(path, std::ios::binary | std::ios::trunc);
+    OutputFile file(path);
+    auto& output = file.stream();
     output.write(format.data(), format.size());
     write_state(output, checkpoint.model);
     write_modes(output, checkpoint.modes);
@@ -314,7 +338,7 @@ void save_checkpoint(const std::filesystem::path& path, const TrainingCheckpoint
         write_integer(output, checkpoint.random_key->seed);
         write_integer(output, checkpoint.random_key->stream);
     }
-    output.close();
+    file.commit();
 }
 
 TrainingCheckpoint load_checkpoint(const std::filesystem::path& path) {

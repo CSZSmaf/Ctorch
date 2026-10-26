@@ -4,6 +4,7 @@
 #include "ops/numeric.h"
 
 #include <cstring>
+#include <stdexcept>
 
 namespace dl {
 
@@ -29,10 +30,14 @@ void Tensor::requires_grad_(bool enabled) const {
 Tensor Tensor::detach() const { return detail::make_tensor(impl_->data); }
 
 void Tensor::backward() const {
-    detail::run_backward(impl_->autograd->edge, detail::numeric::full({}, 1.0, dtype(), device()));
+    if (numel() != 1) throw std::invalid_argument("backward needs an explicit seed for a non-scalar result");
+    backward(ones(shape(), {.dtype = accumulation_dtype(dtype()), .device = device()}));
 }
 
 void Tensor::backward(const Tensor& seed) const {
+    if (!impl_->autograd) throw std::logic_error("backward requires a tensor that tracks gradients");
+    if (seed.shape() != shape() || seed.device() != device())
+        throw std::invalid_argument("backward seed must match the result shape and device");
     detail::run_backward(impl_->autograd->edge, detail::data_of(seed));
 }
 

@@ -142,6 +142,15 @@ inline Tensor vector_norm(const Tensor& input, std::initializer_list<Index> axes
 /// 左向量临时增加行维，右向量临时增加列维，输出移除对应维；两向量得到标量。
 /// f16/bf16 输入使用 FP32 累积和输出，梯度同样使用 FP32；AutocastGuard 为 FP32 输入选择低精度 GEMM。
 DL_API Tensor matmul(const Tensor& a, const Tensor& b);
+/// 按对应轴收缩两个浮点张量；输出依次保留 a、b 的非收缩轴，轴列表内互异。
+/// 通过 permute、reshape 和 matmul 组合，布局复制与一阶梯度沿用这些操作。
+DL_API Tensor tensordot(const Tensor& a, const Tensor& b, Shape axes_a, Shape axes_b);
+/// 在最后一维的相邻元素对上旋转；cosine/sine 可广播到 input[..., D/2]，D 为正偶数。
+DL_API Tensor rotary_embedding(const Tensor& input, const Tensor& cosine, const Tensor& sine);
+/// Q=[B,Hq,L,D]，K=[B,Hkv,S,D]，V=[B,Hkv,S,Dv]，Hq 是 Hkv 的正整数倍。
+/// 以分组广播复用 K/V，mask 按 [B,Hq,L,S] 广播；沿用数学 attention 的精度和求导。
+DL_API Tensor grouped_query_attention(const Tensor& query, const Tensor& key, const Tensor& value,
+                                      std::optional<Tensor> keep_mask = std::nullopt);
 
 /// 对末尾特征计算 input * weight^T + bias，保留所有前导维度。
 /// input 为 [..., in]，weight 为 [out, in]，可选 bias 为 [out]；沿用 matmul 的精度策略。

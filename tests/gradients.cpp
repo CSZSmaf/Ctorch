@@ -5,6 +5,20 @@ using test::directional_check;
 int main() {
     return test::run([] {
         directional_check({-.7, .2, 1.2, -1.1, .5, .9}, {2, 3}, [](const auto& x) {
+            return dl::sum(dl::tensordot(x, test::tensor({1, 2, 3}, {3}), {-1}, {0}));
+        });
+        directional_check({-.7, .2, 1.2, -1.1, .5, .9, .3, -.2}, {2, 4}, [](const auto& x) {
+            dl::nn::RotaryEmbedding rotary(4, 8, 10000, {.dtype = dl::DType::f64});
+            return dl::sum(rotary.forward(x, 2) * x);
+        });
+        auto scalar = test::tensor({2}, {1}, true);
+        auto consumed = scalar * scalar;
+        consumed.backward();
+        bool rejected = false;
+        try { consumed.backward(); } catch (const std::logic_error&) { rejected = true; }
+        test::expect(rejected, "a consumed graph requires a new forward");
+        test::gradient(scalar, {4});
+        directional_check({-.7, .2, 1.2, -1.1, .5, .9}, {2, 3}, [](const auto& x) {
             return dl::sum(dl::pad(x.transpose(0, 1), {1, 2, 2, 0}, .5) * .7);
         });
         directional_check({-.7, .2, 1.2, -1.1, .5, .9}, {2, 3}, [](const auto& x) {

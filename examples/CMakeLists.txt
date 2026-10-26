@@ -2,7 +2,8 @@ include(targets.cmake)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/bin")
 
 foreach(example IN ITEMS ${CTORCH_CPP_EXAMPLES} mnist_mlp mnist_cnn mnist_lenet cifar_resnet
-                         byte_transformer shakespeare_transformer text_generate recurrent_train segmentation variable_length)
+                         byte_transformer shakespeare_transformer text_generate recurrent_train segmentation variable_length
+                         decoder_train decoder_generate)
     ctorch_add_example(ctorch_${example} ${example}.cpp)
 endforeach()
 

@@ -16,7 +16,7 @@ if (stopping.step(validation_loss)) break;
 
 指标比最佳值改善超过 `min_delta` 时，未改善次数清零。连续 5 次未改善后，`step()` 返回 `true`。比较准确率时把模式设为 `maximize`。输入指标是有限数值，`patience` 为正整数。
 
-早停只决定是否结束循环。最佳模型由应用保存，可以在 `step()` 之前比较本轮指标与 `best()`。首次验证时直接保存。
+`best()` 返回最近一次超过 `min_delta` 的改善值，用于早停判断。保存验证指标最优的模型时，应用另行维护最优指标，每次变好就保存权重，见[分割示例](projects/segmentation.md)。
 
 ## 平台期调整学习率
 

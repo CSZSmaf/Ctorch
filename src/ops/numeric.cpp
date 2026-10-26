@@ -155,6 +155,20 @@ TensorData compare(const TensorData& a, const TensorData& b, Compare operation) 
 TensorData sum(const TensorData& input, const Shape& axes, KeepDim keep) {
     return backend(input.device()).sum(compute(input), axes, keep);
 }
+TensorData mean(const TensorData& input, const Shape& axes, KeepDim keep) {
+    if (auto kernel = backend(input.device()).mean) return kernel(compute(input), axes, keep);
+    Index count = 1;
+    for (auto axis : axes) count *= input.layout.sizes[axis];
+    return scale(sum(input, axes, keep), 1.0 / static_cast<double>(count));
+}
+VarianceResult variance(const TensorData& input, const Shape& axes, double correction, KeepDim keep) {
+    if (auto kernel = backend(input.device()).variance) return kernel(compute(input), axes, correction, keep);
+    Index count = 1;
+    for (auto axis : axes) count *= input.layout.sizes[axis];
+    auto centered = sub(input, mean(input, axes, KeepDim::yes));
+    auto output = scale(sum(mul(centered, centered), axes, keep), 1.0 / (count - correction));
+    return {std::move(output), std::move(centered)};
+}
 void sum_into(TensorData& target, const TensorData& input, const Shape& axes, bool accumulate) {
     backend(input.device()).sum_into(target, compute(input), axes, accumulate);
 }
@@ -201,7 +215,8 @@ NormalizationResult normalization(const TensorData& input, const std::optional<T
     bool save_statistics) {
     const auto dtype = accumulation_dtype(input.dtype);
     NormalizationResult result{empty_data(input.layout.sizes, dtype, input.device()), std::nullopt};
-    if (save_statistics) result.statistics = empty_data({2, input.layout.numel() / width}, dtype, input.device());
+    const auto statistics_dtype = input.device().type == DeviceType::cpu ? DType::f64 : dtype;
+    if (save_statistics) result.statistics = empty_data({2, input.layout.numel() / width}, statistics_dtype, input.device());
     backend(input.device()).normalization(input, weight, bias, width, epsilon, kind, result);
     return result;
 }
@@ -217,8 +232,9 @@ NormalizationResult batch_normalization(const TensorData& input, const std::opti
     const std::optional<TensorData>& bias, std::optional<BatchNormalizationState> state,
     bool training, double momentum, double epsilon) {
     const auto dtype = accumulation_dtype(input.dtype);
+    const auto statistics_dtype = input.device().type == DeviceType::cpu ? DType::f64 : dtype;
     NormalizationResult result{empty_data(input.layout.sizes, dtype, input.device()),
-        empty_data({2, input.layout.sizes[1]}, dtype, input.device())};
+        empty_data({2, input.layout.sizes[1]}, statistics_dtype, input.device())};
     backend(input.device()).batch_normalization(input, weight, bias, state, training, momentum, epsilon, result);
     return result;
 }

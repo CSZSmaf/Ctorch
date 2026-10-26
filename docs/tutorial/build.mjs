@@ -30,6 +30,7 @@ const sections = {
     ["docs/README.md", "手册目录"],
     ["docs/build.md", "构建与安装"],
     ["docs/tensors.md", "张量与梯度"],
+    ["docs/migration.md", "从 PyTorch 迁移"],
     ["docs/training.md", "模型与训练"],
     ["docs/execution.md", "组合与执行"],
     ["docs/performance.md", "性能与内存"],

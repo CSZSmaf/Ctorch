@@ -129,6 +129,10 @@ void slice_backward_into(TensorData& target, const TensorData& grad,
 
 Shape reduced_shape(const Shape& shape, const Shape& axes, KeepDim keep);
 TensorData sum(const TensorData& input, const Shape& axes, KeepDim keep);
+TensorData mean(const TensorData& input, const Shape& axes, KeepDim keep);
+/// centered 保存减去均值后的值，供方差与标准差的 VJP 共用。
+struct VarianceResult { TensorData output, centered; };
+VarianceResult variance(const TensorData& input, const Shape& axes, double correction, KeepDim keep);
 /// 目标连续且独立，按归约结果的逻辑顺序写入；目标形状可采用其连续重排。
 void sum_into(TensorData& target, const TensorData& input, const Shape& axes, bool accumulate);
 TensorData amax(const TensorData& input, const Shape& axes, KeepDim keep);
@@ -149,7 +153,8 @@ TensorData softmax_backward(const TensorData& grad, const TensorData& output,
                            Index axis, bool logarithmic);
 
 enum class NormalizationKind { layer, rms };
-/// statistics 的两行分别存均值与逆标准差；逐行归一化在无需求导时省去该缓冲。
+/// statistics 的两行分别存均值与逆标准差；CPU 用 f64 保存统计，CUDA 用 f32。
+/// 逐行归一化在无需求导时省去该缓冲。
 struct NormalizationResult { TensorData output; std::optional<TensorData> statistics; };
 /// 三个连续目标依次对应输入、权重和偏置；累计标志决定覆盖还是追加贡献。
 struct NormalizationGradients {

@@ -38,6 +38,8 @@ void scale_into(TensorData& target, const TensorData& input, double factor, bool
 TensorData where(const TensorData& mask, const TensorData& a, const TensorData& b);
 TensorData compare(const TensorData& a, const TensorData& b, numeric::Compare operation);
 TensorData sum(const TensorData& input, const Shape& axes, KeepDim keep);
+TensorData mean(const TensorData& input, const Shape& axes, KeepDim keep);
+numeric::VarianceResult variance(const TensorData& input, const Shape& axes, double correction, KeepDim keep);
 void sum_into(TensorData& target, const TensorData& input, const Shape& axes, bool accumulate);
 TensorData amax(const TensorData& input, const Shape& axes, KeepDim keep);
 TensorData arg_extreme(const TensorData& input, Index axis, KeepDim keep, bool maximum);

@@ -33,9 +33,7 @@ Tensor variance(const Tensor& input, Shape axes, double correction, KeepDim keep
     axes = detail::normalize_axes(std::move(axes), input.ndim());
     const auto count = group_size(input, axes);
     const double denominator = static_cast<double>(count) - correction;
-    auto average = numeric::scale(numeric::sum(data_of(input), axes, KeepDim::yes), 1.0 / count);
-    auto centered = numeric::sub(data_of(input), average);
-    auto result = numeric::scale(numeric::sum(numeric::mul(centered, centered), axes, keep), 1.0 / denominator);
+    auto [result, centered] = numeric::variance(data_of(input), axes, correction, keep);
     if (deviation) result = numeric::unary(result, numeric::Unary::sqrt);
     auto kept_shape = numeric::reduced_shape(input.shape(), axes, KeepDim::yes);
     auto saved = result;

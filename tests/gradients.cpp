@@ -4,6 +4,36 @@ using test::directional_check;
 
 int main() {
     return test::run([] {
+        // 常量长向量的均值保持常量，归一化输出及其和的梯度都为零。
+        for (dl::Index width : {1001, 4096}) {
+            for (float value : {0.1f, 1.1f, 10.1f, 1e6f}) {
+                auto source = dl::full({width, 2}, value, {.requires_grad = true});
+                auto input = source.transpose(0, 1);
+                for (auto actual : dl::mean(input, {1}).to_vector<float>()) test::close(actual, value, 0, 0);
+                for (auto actual : dl::var(input, {1}, 0).to_vector<float>()) test::close(actual, 0, 0, 0);
+                auto layer = dl::layer_norm(input, {width});
+                for (auto actual : layer.to_vector<float>()) test::close(actual, 0, 0, 0);
+                dl::sum(layer).backward();
+                for (auto actual : source.grad()->to_vector<float>()) test::close(actual, 0, 1e-10, 0);
+                source.zero_grad();
+                auto batch = dl::batch_norm(source, dl::BatchNormState{dl::zeros({2}), dl::ones({2})},
+                    std::nullopt, std::nullopt, true, 1.0);
+                for (auto actual : batch.output.to_vector<float>()) test::close(actual, 0, 0, 0);
+                for (auto actual : batch.state->mean.to_vector<float>()) test::close(actual, value, 0, 0);
+                for (auto actual : batch.state->variance.to_vector<float>()) test::close(actual, 0, 0, 0);
+                dl::sum(batch.output).backward();
+                for (auto actual : source.grad()->to_vector<float>()) test::close(actual, 0, 1e-10, 0);
+            }
+        }
+        // 大偏移下的近常量数据保留小方差，非连续轴沿原布局归约。
+        auto close_values = test::tensor({1e6, 1e6 + .125, 1e6 + .25, 1e6 + .375}, {2, 2})
+            .astype(dl::DType::f32).detach();
+        close_values.requires_grad_();
+        auto variance = dl::var(close_values.transpose(0, 1), {0}, 0);
+        test::values(variance, {.00390625, .00390625}, 1e-9, 1e-7);
+        dl::sum(variance).backward();
+        test::gradient(close_values, {-.0625, .0625, -.0625, .0625});
+
         directional_check({-0.7, 0.2, 1.2, -1.1, 0.5, 0.9}, {2, 3}, [](const auto& x) {
             return dl::sum(dl::gelu(x) + dl::sigmoid(x) + dl::tanh(x));
         });

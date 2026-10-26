@@ -42,14 +42,18 @@ public:
     /// CPU 地址用于宿主读取，CUDA 地址用于设备接口；item 与 to_vector 提供宿主副本。
     template <class T> const T* data() const { return static_cast<const T*>(raw_data()); }
 
-    template <class T> T item() const { return *detach().to(Device::cpu()).data<T>(); }
+    /// 将单元素张量转换为 T 的数值并复制到宿主；T 使用框架支持的标量类型。
+    template <class T> T item() const {
+        Tensor value = detach().to(Device::cpu()).astype(dtype_of<T>);
+        return *value.data<T>();
+    }
 
-    /// 按逻辑行主序复制到宿主容器，保持原张量的数据与求导历史。
+    /// 按逻辑行主序转换为 T 并复制到宿主容器，保持原张量的数据与求导历史。
     template <class T> std::vector<T> to_vector() const {
         if (numel() == 0) {
             return {};
         }
-        auto dense = detach().to(Device::cpu()).contiguous();
+        Tensor dense = detach().to(Device::cpu()).astype(dtype_of<T>).contiguous();
         auto first = dense.data<T>();
         return std::vector<T>(first, first + numel());
     }

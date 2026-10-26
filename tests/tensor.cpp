@@ -2,6 +2,23 @@
 
 int main() {
     return test::run([] {
+        auto scalar = dl::full({}, 1.5, {.dtype = dl::DType::f64, .requires_grad = true});
+        test::close(scalar.item<float>(), 1.5);
+        test::close(scalar.astype(dl::DType::f32).item<double>(), 1.5);
+        test::expect(scalar.item<dl::Index>() == 1, "scalar numeric conversion");
+        test::expect(scalar.requires_grad() && !scalar.grad(), "host reads preserve autograd state");
+        auto converted = test::tensor({1.5, -2, 3, 4.5}, {2, 2}).transpose(0, 1);
+        test::expect(converted.to_vector<float>() == std::vector<float>({1.5f, 3, -2, 4.5f}),
+                     "host conversion follows logical layout");
+        test::expect(dl::zeros({0}).to_vector<double>().empty(), "empty host conversion");
+        auto large_integer = test::indices({9007199254740993LL});
+        test::expect(large_integer.item<dl::Index>() == 9007199254740993LL, "integer extraction stays exact");
+        for (auto dtype : {dl::DType::f16, dl::DType::bf16, dl::DType::boolean}) {
+            auto one = dl::ones({}, {.dtype = dtype});
+            test::close(one.item<float>(), 1);
+            test::expect(one.to_vector<double>() == std::vector<double>({1}), "storage type conversion");
+        }
+
         auto x = test::tensor({1, 2, 3, 4, 5, 6}, {2, 3}, true);
         auto view = x.transpose(0, 1);
         test::expect(view.data<double>() == x.data<double>(), "transpose shares storage");

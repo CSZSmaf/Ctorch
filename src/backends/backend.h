@@ -48,6 +48,9 @@ struct Backend {
     TensorData (*where)(const TensorData&, const TensorData&, const TensorData&);
     TensorData (*compare)(const TensorData&, const TensorData&, numeric::Compare);
     TensorData (*sum)(const TensorData&, const Shape&, KeepDim);
+    // 统计内核可在写出前完成宽精度累积；其他后端复用数值层的组合实现。
+    TensorData (*mean)(const TensorData&, const Shape&, KeepDim) = nullptr;
+    numeric::VarianceResult (*variance)(const TensorData&, const Shape&, double, KeepDim) = nullptr;
     void (*sum_into)(TensorData&, const TensorData&, const Shape&, bool);
     TensorData (*amax)(const TensorData&, const Shape&, KeepDim);
     TensorData (*arg_extreme)(const TensorData&, Index, KeepDim, bool);

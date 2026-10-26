@@ -1,6 +1,7 @@
 #include "kernels/cpu/ops.h"
 
 #include "core/dispatch.h"
+#include "kernels/cpu/moments.h"
 
 #include <algorithm>
 #include <cmath>
@@ -30,33 +31,24 @@ void normalization(const TensorData& input, const std::optional<TensorData>& wei
             const auto* scale = weight ? weight->data<A>() : nullptr;
             const auto* shift = bias ? bias->data<A>() : nullptr;
             auto* output = result.output.mutable_data<A>();
-            auto* statistics = result.statistics ? result.statistics->mutable_data<A>() : nullptr;
-            const A inverse_width = A{1} / static_cast<A>(width);
+            auto* statistics = result.statistics ? result.statistics->mutable_data<double>() : nullptr;
 
             // 方差围绕均值计算，整行中间值只存在于标量中；原输入布局直接参与寻址。
             for (Index row = 0; row < rows; ++row) {
                 const auto base = row * width;
-                A mean = 0;
-                if (centered) {
-                    for (Index col = 0; col < width; ++col)
-                        mean += static_cast<A>(source[offset(input.layout, base + col)]);
-                    mean *= inverse_width;
-                }
-                A squares = 0;
-                for (Index col = 0; col < width; ++col) {
-                    const A value = static_cast<A>(source[offset(input.layout, base + col)]) - mean;
-                    squares += value * value;
-                }
-                const A inverse_std = A{1} / std::sqrt(squares * inverse_width + static_cast<A>(epsilon));
+                const auto [mean, variance] = moments(width, [&](Index col) {
+                    return static_cast<A>(source[offset(input.layout, base + col)]);
+                }, centered);
+                const double inverse_std = 1.0 / std::sqrt(variance + epsilon);
                 if (statistics) {
                     statistics[row] = mean;
                     statistics[rows + row] = inverse_std;
                 }
                 for (Index col = 0; col < width; ++col) {
-                    A value = (static_cast<A>(source[offset(input.layout, base + col)]) - mean) * inverse_std;
+                    double value = (static_cast<double>(source[offset(input.layout, base + col)]) - mean) * inverse_std;
                     if (scale) value *= scale[offset(weight->layout, col)];
                     if (shift) value += shift[offset(bias->layout, col)];
-                    output[base + col] = value;
+                    output[base + col] = static_cast<A>(value);
                 }
             }
         });
@@ -74,23 +66,23 @@ void normalization_backward(const TensorData& grad, const TensorData& input,
             using A = FloatAccumulator<T>;
             const auto* source = input.data<T>();
             const auto* upstream = grad.data<A>();
-            const auto* moments = statistics.data<A>();
+            const auto* moments = statistics.data<double>();
             const auto* scale = weight ? weight->data<A>() : nullptr;
             auto* dx = result.input ? result.input->mutable_data<A>() : nullptr;
             auto* dw = result.weight ? result.weight->mutable_data<A>() : nullptr;
             auto* db = result.bias ? result.bias->mutable_data<A>() : nullptr;
             if (dw && !result.accumulate[1]) std::fill_n(dw, width, A{0});
             if (db && !result.accumulate[2]) std::fill_n(db, width, A{0});
-            const A inverse_width = A{1} / static_cast<A>(width);
+            const double inverse_width = 1.0 / static_cast<double>(width);
 
             for (Index row = 0; row < rows; ++row) {
                 const auto base = row * width;
-                const A mean = moments[row], inverse_std = moments[rows + row];
-                A average = 0, projection = 0;
+                const double mean = moments[row], inverse_std = moments[rows + row];
+                double average = 0, projection = 0;
                 if (dx) {
                     for (Index col = 0; col < width; ++col) {
-                        const A z = (static_cast<A>(source[offset(input.layout, base + col)]) - mean) * inverse_std;
-                        A value = upstream[offset(grad.layout, base + col)];
+                        const double z = (static_cast<double>(source[offset(input.layout, base + col)]) - mean) * inverse_std;
+                        double value = upstream[offset(grad.layout, base + col)];
                         if (scale) value *= scale[offset(weight->layout, col)];
                         if (centered) average += value;
                         projection += value * z;
@@ -102,14 +94,14 @@ void normalization_backward(const TensorData& grad, const TensorData& input,
                 // u = dy * weight；LayerNorm 去除均值方向和归一化方向，RMSNorm 只去除后者。
                 // 同一次遍历完成逐行 dx 与跨行的仿射梯度累积，空 batch 自然留下零参数梯度。
                 for (Index col = 0; col < width; ++col) {
-                    const A z = (static_cast<A>(source[offset(input.layout, base + col)]) - mean) * inverse_std;
+                    const double z = (static_cast<double>(source[offset(input.layout, base + col)]) - mean) * inverse_std;
                     const A dy = upstream[offset(grad.layout, base + col)];
                     if (dx) {
-                        const A value = scale ? dy * scale[offset(weight->layout, col)] : dy;
-                        const A contribution = (value - average - z * projection) * inverse_std;
-                        dx[base + col] = (result.accumulate[0] ? dx[base + col] : A{0}) + contribution;
+                        const double value = scale ? static_cast<double>(dy) * scale[offset(weight->layout, col)] : dy;
+                        const double contribution = (value - average - z * projection) * inverse_std;
+                        dx[base + col] = static_cast<A>((result.accumulate[0] ? dx[base + col] : A{0}) + contribution);
                     }
-                    if (dw) dw[col] += dy * z;
+                    if (dw) dw[col] = static_cast<A>(dw[col] + dy * z);
                     if (db) db[col] += dy;
                 }
             }

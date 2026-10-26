@@ -6,6 +6,7 @@
 | --- | --- |
 | [构建与安装](build.md) | CPU、CUDA、cuDNN、OpenVINO 和 CMake 安装包 |
 | [张量与梯度](tensors.md) | 数据类型、设备、视图、算子与反向传播 |
+| [从 PyTorch 迁移](migration.md) | 接口对应、参数绑定、注意力、状态与数值对齐 |
 | [模型与训练](training.md) | 模块、优化器、数据加载、混合精度和检查点 |
 | [组合与执行](execution.md) | 函数式状态、随机 key、执行计划和激活重算 |
 | [性能与内存](performance.md) | 缓冲复用、C++ 内层循环和模型计时 |

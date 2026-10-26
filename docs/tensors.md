@@ -4,7 +4,40 @@
 
 CPU 通用浮点计算使用 `f32` / `f64`，CUDA 通用浮点计算使用 `f32`。`f16` / `bf16` 用于低精度存储及选定的矩阵乘、卷积和注意力路径；归约与主参数按算子约定使用 FP32。索引使用 `i64`，掩码使用 `bool`。
 
+存储类型、计算类型和输出类型可以不同。例如，BF16 输入的矩阵乘使用 FP32 累加，并返回 FP32 张量。
+
+| 设备与操作 | 输入存储 | 计算与累加 | 输出 |
+| --- | --- | --- | --- |
+| CPU 通用浮点计算 | FP32 / FP64 | 对应浮点类型 | 对应浮点类型 |
+| CPU sum、mean、var、stddev | FP16 / BF16 / FP32 / FP64 | FP64 统计累加 | FP64 输入返回 FP64，其余返回 FP32 |
+| CPU LayerNorm、RMSNorm、BatchNorm | FP16 / BF16 / FP32 / FP64 | FP64 统计及输入梯度归约 | FP64 输入返回 FP64，其余返回 FP32 |
+| CPU 低精度矩阵乘 | FP16 / BF16 | 转成 FP32 计算 | FP32 |
+| CUDA 通用浮点计算 | FP32 | FP32 | FP32 |
+| CUDA 低精度逐元素运算与归一化 | FP16 / BF16 | 读取后转成 FP32 计算 | FP32 |
+| CUDA 低精度矩阵乘 | FP16 / BF16 | FP32 累加 | FP32 |
+| cuDNN 低精度卷积 | FP16 / BF16 | 低精度乘法、FP32 累加，按选定低精度写回 | 展开为 FP32 |
+| cuDNN 注意力 | FP16 / BF16 | 由融合注意力内核组织低精度计算和归约 | FP32 |
+
+CPU 统计保留宽精度的均值，再计算中心平方和。输出张量的类型保持不变。CUDA 的归约和归一化使用 FP32 分块计算。低精度量化发生在读取之前，统计累加无法恢复量化时已经丢失的信息。
+
+FP64 数据可以保存、迁移和交换；CUDA 通用运算采用上表中的类型。`astype()` 显式转换类型，`AutocastGuard` 选择矩阵乘、卷积等算子的计算输入类型。CPU 的 FP16/BF16 矩阵乘使用 FP32 内核。
+
 通过 `TensorOptions::device` 选择设备，或调用 `Tensor::to(Device)` 显式迁移。一次运算的输入使用相同设备及对应算子要求的 dtype。CUDA 内核布局支持至多 16 维。
+
+## 读取数值
+
+`item<T>()` 将单元素张量转换为 `T` 的数值。`to_vector<T>()` 按逻辑行主序转换并复制全部元素，转置和切片也按逻辑顺序读取。
+
+```cpp
+auto x = dl::full({}, 1.5, {.dtype = dl::DType::f64});
+float value = x.item<float>();                 // 1.5f
+auto values = x.to_vector<float>();            // {1.5f}
+auto index = x.item<dl::Index>();               // 1
+```
+
+`T` 可用 `float`、`double`、`dl::Index`、`bool`、`dl::Float16` 或 `dl::BFloat16`。读取不改变原张量的类型、存储或求导历史。CUDA 张量先复制到 CPU，读取操作会等待该数据传输完成。
+
+`data<T>()` 返回原存储地址，`T` 与张量 dtype 对应。它用于底层数据访问，元素位置由张量的 shape、stride 和 offset 决定。CUDA 地址交给设备接口使用。
 
 ## 存储与视图
 

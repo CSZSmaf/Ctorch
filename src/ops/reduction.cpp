@@ -65,10 +65,8 @@ Tensor reduce(const Tensor& input, Shape axes, KeepDim keep, bool average) {
         count *= input.size(axis);
     }
     const double factor = average ? 1.0 / static_cast<double>(count) : 1.0;
-    auto result = detail::numeric::sum(detail::data_of(input), axes, keep);
-    if (average) {
-        result = detail::numeric::scale(result, factor);
-    }
+    auto result = average ? detail::numeric::mean(detail::data_of(input), axes, keep)
+                          : detail::numeric::sum(detail::data_of(input), axes, keep);
     auto expanded_shape = detail::numeric::reduced_shape(input.shape(), axes, KeepDim::yes);
     return detail::record(std::move(result), {detail::gradient_edge(input)},
         [shape = input.shape(), expanded_shape = std::move(expanded_shape), factor]

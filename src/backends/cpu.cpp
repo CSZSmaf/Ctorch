@@ -46,6 +46,8 @@ const Backend& cpu_backend() {
         .where = cpu::where,
         .compare = cpu::compare,
         .sum = cpu::sum,
+        .mean = cpu::mean,
+        .variance = cpu::variance,
         .sum_into = cpu::sum_into,
         .amax = cpu::amax,
         .arg_extreme = cpu::arg_extreme,

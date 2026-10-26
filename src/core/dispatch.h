@@ -7,7 +7,7 @@
 
 namespace dl::detail {
 
-/// FP16/BF16 的逐元素计算和归约使用 float，CPU double 保持自己的累积精度。
+/// 低精度通用计算与输出使用 float，double 输入保持 double；CPU 统计内核另用 double 累加。
 template <class T> using FloatAccumulator = std::conditional_t<std::is_same_v<T, double>, double, float>;
 
 /// dtype 在进入数值循环前解析，循环中的地址与运算具有具体 C++ 类型。

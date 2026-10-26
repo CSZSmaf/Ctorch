@@ -4,7 +4,9 @@
 #include "dl/transfer.h"
 #include "ops/numeric.h"
 
+#include <condition_variable>
 #include <deque>
+#include <thread>
 
 namespace dl::data {
 namespace {
@@ -14,75 +16,138 @@ Tensor snapshot(const Tensor& tensor) {
     return value.device() == Device::cpu() ? value.clone() : value.to(Device::cpu());
 }
 
-struct Slot {
-    std::optional<Batch> host;
-    std::optional<Transfer> input, target;
-    bool input_staged = false, target_staged = false;
+struct Field {
+    std::optional<Tensor> host;
+    std::optional<Transfer> transfer;
+    bool staged = false;
 
-    void stage(Batch batch, Device device) {
-        if (input) { input->wait(); target->wait(); }
-        input.reset();
-        target.reset();
-        auto prepare = [&](const Tensor& tensor, const Tensor* previous, bool& staged) {
-            // 连续页锁定输入直接借用；只有预取器自己建立的暂存副本进入后续复用。
-            if (device.type == DeviceType::cpu || tensor.device().type != DeviceType::cpu
-                || (tensor.is_pinned() && tensor.is_contiguous())) {
-                staged = false;
-                return tensor;
-            }
-            if (staged && !tensor.requires_grad()
-                && previous->shape() == tensor.shape() && previous->dtype() == tensor.dtype()) {
-                auto buffer = *previous;
-                detail::numeric::copy_into(detail::TensorAccess::mutable_data(buffer), detail::data_of(tensor));
-                return buffer;
-            }
+    void stage(const Tensor& tensor, Device device) {
+        if (transfer) transfer->wait();
+        transfer.reset();
+        // 连续页锁定输入直接借用；自建暂存副本在传输完成后复用。
+        if (device.type == DeviceType::cpu || tensor.device().type != DeviceType::cpu
+            || (tensor.is_pinned() && tensor.is_contiguous())) {
+            host = tensor;
+            staged = false;
+        } else if (staged && !tensor.requires_grad() && host->shape() == tensor.shape() && host->dtype() == tensor.dtype()) {
+            detail::numeric::copy_into(detail::TensorAccess::mutable_data(*host), detail::data_of(tensor));
+        } else {
+            host = tensor.pin_memory();
             staged = !tensor.requires_grad();
-            return tensor.pin_memory();
-        };
-        auto x = prepare(batch.input, host ? &host->input : nullptr, input_staged);
-        auto y = prepare(batch.target, host ? &host->target : nullptr, target_staged);
-        host = Batch{std::move(x), std::move(y)};
-        input.emplace(host->input, device);
-        target.emplace(host->target, device);
+        }
+        transfer.emplace(*host, device);
     }
 
-    Batch result() const { return {input->tensor(), target->tensor()}; }
+    Tensor result(bool save) const {
+        if (!save) return transfer->tensor();
+        return snapshot(staged ? *host : transfer->tensor());
+    }
+};
 
-    Batch saved() const {
-        // 自有暂存值在 pending 阶段保持不变；借用源则以已经传输的目标值为准。
-        return {snapshot(input_staged ? host->input : input->tensor()),
-                snapshot(target_staged ? host->target : target->tensor())};
+struct Slot {
+    std::vector<Field> fields;
+
+    void stage(const Batch& batch, Device device) {
+        fields.resize(2 + batch.extra.size());
+        fields[0].stage(batch.input, device);
+        fields[1].stage(batch.target, device);
+        for (std::size_t i = 0; i < batch.extra.size(); ++i) fields[i + 2].stage(batch.extra[i], device);
+    }
+
+    Batch result(bool save = false) const {
+        Batch batch{fields[0].result(save), fields[1].result(save), {}};
+        for (std::size_t i = 2; i < fields.size(); ++i) batch.extra.push_back(fields[i].result(save));
+        return batch;
     }
 };
 
 } // namespace
 
 struct PrefetchLoader::Impl {
-    Impl(DataLoader& source, Device device, std::size_t depth) : loader(source), device(device), depth(depth) {}
+    Impl(DataLoader& source, Device device, std::size_t depth, bool background)
+        : loader(source), device(device), depth(depth), background(background) {}
+    ~Impl() { pause(); }
 
-    void enqueue(Batch batch) {
+    void start() {
+        if (!background || worker.joinable() || done) return;
+        worker = std::jthread([this](std::stop_token stop) {
+            try {
+                std::unique_lock lock(mutex);
+                while (changed.wait(lock, stop, [&] { return !ready; })) {
+                    lock.unlock();
+                    auto batch = loader.next();
+                    lock.lock();
+                    if (!batch) { done = true; changed.notify_all(); return; }
+                    ready = std::move(batch);
+                    changed.notify_all();
+                }
+            } catch (...) {
+                std::lock_guard lock(mutex);
+                failure = std::current_exception();
+                changed.notify_all();
+            }
+        });
+    }
+
+    // 完成正在整理的批次，再停止线程。ready 保留该批次及其对应的采样位置。
+    void pause() {
+        if (!worker.joinable()) return;
+        worker.request_stop();
+        changed.notify_all();
+        worker.join();
+    }
+
+    std::optional<Batch> take() {
+        if (!background) return loader.next();
+        start();
+        std::unique_lock lock(mutex);
+        changed.wait(lock, [&] { return ready || done || failure; });
+        if (failure) std::rethrow_exception(failure);
+        auto batch = std::move(ready);
+        ready.reset();
+        changed.notify_all();
+        return batch;
+    }
+
+    void enqueue(const Batch& batch) {
         auto slot = free.empty() ? std::make_unique<Slot>() : std::move(free.front());
         if (!free.empty()) free.pop_front();
-        slot->stage(std::move(batch), device);
+        slot->stage(batch, device);
         pending.push_back(std::move(slot));
+    }
+
+    void clear() {
+        pause();
+        pending.clear();
+        free.clear();
+        ready.reset();
+        done = false;
+        failure = nullptr;
     }
 
     DataLoader& loader;
     Device device;
     std::size_t depth;
+    bool background, done = false;
     std::deque<std::unique_ptr<Slot>> pending, free;
+    std::optional<Batch> ready;
+    std::exception_ptr failure;
+    std::mutex mutex;
+    std::condition_variable_any changed;
+    std::jthread worker;
 };
 
-PrefetchLoader::PrefetchLoader(DataLoader& source, Device device, std::size_t depth)
-    : impl_(std::make_unique<Impl>(source, device, depth)) {}
+PrefetchLoader::PrefetchLoader(DataLoader& source, Device device, std::size_t depth, bool background)
+    : impl_(std::make_unique<Impl>(source, device, depth, background)) {}
 PrefetchLoader::~PrefetchLoader() = default;
 DataLoader& PrefetchLoader::source() const { return impl_->loader; }
 
 std::optional<Batch> PrefetchLoader::next() {
+    impl_->start();
     while (impl_->pending.size() < impl_->depth) {
-        auto batch = impl_->loader.next();
+        auto batch = impl_->take();
         if (!batch) break;
-        impl_->enqueue(std::move(*batch));
+        impl_->enqueue(*batch);
     }
     if (impl_->pending.empty()) return std::nullopt;
     auto result = impl_->pending.front()->result();
@@ -92,22 +157,33 @@ std::optional<Batch> PrefetchLoader::next() {
 }
 
 void PrefetchLoader::reset() {
-    impl_->pending.clear();
-    impl_->free.clear();
+    impl_->clear();
     impl_->loader.reset();
 }
 
+void PrefetchLoader::reset(std::vector<Index> order) {
+    impl_->clear();
+    impl_->loader.reset(std::move(order));
+}
+
 PrefetchState PrefetchLoader::state_dict() const {
-    PrefetchState result{impl_->depth, {}};
-    result.pending.reserve(impl_->pending.size());
-    for (const auto& slot : impl_->pending) result.pending.push_back(slot->saved());
+    impl_->pause();
+    if (impl_->failure) std::rethrow_exception(impl_->failure);
+    PrefetchState result{impl_->depth, {}, impl_->background};
+    for (const auto& slot : impl_->pending) result.pending.push_back(slot->result(true));
+    if (impl_->ready) {
+        const auto& batch = *impl_->ready;
+        Batch saved{snapshot(batch.input), snapshot(batch.target), {}};
+        for (const auto& tensor : batch.extra) saved.extra.push_back(snapshot(tensor));
+        result.pending.push_back(std::move(saved));
+    }
     return result;
 }
 
 void PrefetchLoader::load_state_dict(const PrefetchState& state) {
-    impl_->pending.clear();
-    impl_->free.clear();
+    impl_->clear();
     impl_->depth = state.depth;
+    impl_->background = state.background;
     for (const auto& batch : state.pending) impl_->enqueue(batch);
 }
 

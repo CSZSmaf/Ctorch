@@ -28,6 +28,14 @@ dl_status dl_prefetch_loader_create(dl_loader* source, dl_device target, size_t 
     });
 }
 void dl_prefetch_loader_release(dl_prefetch_loader* loader) { delete loader; }
+
+dl_status dl_prefetch_loader_create_background(dl_loader* source, dl_device target, size_t depth, dl_prefetch_loader** output) {
+    *output = nullptr;
+    return invoke([&] {
+        auto value = std::make_unique<dl::data::PrefetchLoader>(*source->value, convert(target), depth, true);
+        *output = new dl_prefetch_loader{source->generator, source->value, std::move(value)};
+    });
+}
 dl_status dl_prefetch_loader_reset(dl_prefetch_loader* loader) { return invoke([&] { loader->value->reset(); }); }
 dl_status dl_prefetch_loader_next(dl_prefetch_loader* loader, dl_tensor** input, dl_tensor** target) {
     *input = nullptr;

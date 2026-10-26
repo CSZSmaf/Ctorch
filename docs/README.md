@@ -8,10 +8,14 @@
 | [张量与梯度](tensors.md) | 数据类型、设备、视图、算子与反向传播 |
 | [从 PyTorch 迁移](migration.md) | 接口对应、参数绑定、注意力、状态与数值对齐 |
 | [模型与训练](training.md) | 模块、优化器、数据加载、混合精度和检查点 |
+| [数据加载](data.md) | 多输入批次、变长序列、后台预取和采样 |
+| [损失函数](objectives.md) | 类别权重、标签平滑、分割损失和 KL 散度 |
+| [训练控制](training-tools.md) | 早停、平台期调度、EMA 和评价指标 |
 | [组合与执行](execution.md) | 函数式状态、随机 key、执行计划和激活重算 |
 | [性能与内存](performance.md) | 缓冲复用、C++ 内层循环和模型计时 |
 | [C17 与外部计算](extensions.md) | C 接口、自定义 VJP、DLPack 和 CUDA 交接 |
 | [OpenVINO / Intel NPU](npu.md) | 编译推理模型、输入输出与异步请求 |
+| [ONNX 导出](onnx.md) | 固定形状推理图、权重绑定和部署 |
 | [架构](architecture.md) | 模块分层、存储拥有权和后端组织 |
 
 ## 示例与测试

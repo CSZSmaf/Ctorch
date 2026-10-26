@@ -6,6 +6,7 @@
 #include <exception>
 
 struct dl_tensor { dl::Tensor value; };
+struct dl_graph { dl::plan::Graph value; };
 struct dl_tensor_list { std::vector<dl::Tensor> value; };
 struct dl_gradients { dl::Gradients value; };
 struct dl_module { std::shared_ptr<dl::nn::UnaryModule> value; };

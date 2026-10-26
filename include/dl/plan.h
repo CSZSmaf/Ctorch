@@ -32,6 +32,20 @@ enum class Effect { none, random, mutation, external };
 /// 语义标记供编译期改写使用，与显示名称无关；custom 保留回调的原有调用方式。
 /// add/relu 分别承诺公开 dl::add/dl::relu 的规格、别名和一阶求导语义。
 enum class Semantic { custom, add, relu };
+using Attribute = std::pair<std::string, std::variant<Index, double, Shape>>;
+/// 可序列化的算子语义与常量属性。kind 独立于显示名称，空值表示只有 C++ 回调。
+struct OperatorInfo { std::string kind; std::vector<Attribute> attributes; };
+struct NodeInfo {
+    std::string name;
+    OperatorInfo operation;
+    Effect effect;
+    std::vector<Value> inputs, outputs;
+};
+struct GraphInfo {
+    std::vector<TensorSpec> values;
+    std::vector<std::pair<Value, std::string>> inputs;
+    std::vector<NodeInfo> nodes;
+};
 using Infer = std::function<OutputSpec(std::span<const TensorSpec>)>;
 using Execute = std::function<Tensor(std::span<const Tensor>)>;
 
@@ -44,6 +58,7 @@ struct Operation {
     Execute execute;
     Effect effect = Effect::none;
     Semantic semantic = Semantic::custom;
+    OperatorInfo description = {};
 };
 
 using MultiInfer = std::function<std::vector<OutputSpec>(std::span<const TensorSpec>)>;
@@ -187,6 +202,8 @@ public:
         return call(std::move(operation), std::span<const Value>(inputs.begin(), inputs.size()));
     }
     const TensorSpec& spec(Value value) const { return values_[value.index].spec; }
+    /// 复制图的规格和算子描述，供导出器与可视化工具读取，不持有执行回调。
+    GraphInfo describe() const;
 
     /// 删除未使用的纯计算，保留全部状态操作及其依赖，随后融合并规划生命周期。
     /// 记录当前线程的 CPU/CUDA autocast 配置，每次执行在此精度作用域内运行。
@@ -205,20 +222,28 @@ private:
         Effect effect;
         Semantic semantic;
         std::vector<Value> inputs, outputs;
+        OperatorInfo description;
     };
     std::vector<TensorSpec> input_specs(std::span<const Value> inputs) const;
     std::vector<Value> append(std::string name, Invocation execute, Effect effect, Semantic semantic,
-        std::span<const Value> inputs, std::vector<OutputSpec> outputs);
+        std::span<const Value> inputs, std::vector<OutputSpec> outputs, OperatorInfo description = {});
     std::vector<ValueInfo> values_;
     std::vector<Input> inputs_;
     std::vector<Node> nodes_;
 };
 
-/// 首批描述复用既有布局函数和 eager 计算；其他算子可直接构造 Operation。
+/// 内置描述复用布局函数和 eager 计算；自定义算子可直接构造 Operation。
 namespace ops {
 DL_API Operation add();
 DL_API Operation add_relu();
 DL_API Operation mul();
+DL_API Operation sub();
+DL_API Operation div();
+DL_API Operation sigmoid();
+DL_API Operation tanh();
+DL_API Operation softmax(Index axis = -1);
+/// 输入为 x、可选 weight、可选 bias；仿射参数依次给出。
+DL_API Operation layer_norm(Shape normalized_shape, double epsilon = 1e-5);
 DL_API Operation matmul();
 /// 输入依次为 [..., in]、[out, in] 和可选的 [out] 偏置，结果保留前导维。
 DL_API Operation linear();

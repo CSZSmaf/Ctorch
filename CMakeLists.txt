@@ -11,6 +11,7 @@ option(CTORCH_USE_BLAS "Use an installed BLAS library with a CBLAS interface" OF
 option(CTORCH_USE_CUDA "Build CUDA float32 kernels and the cuBLAS backend" OFF)
 option(CTORCH_USE_CUDNN "Use installed cuDNN and its C++ frontend for CUDA convolution and attention" OFF)
 option(CTORCH_USE_NPU "Build the optional Intel NPU / OpenVINO inference extension" OFF)
+option(CTORCH_USE_ONNX "Build the independent ONNX inference graph exporter" OFF)
 option(CTORCH_USE_DLPACK "Build zero-copy tensor exchange using installed DLPack headers" OFF)
 option(CTORCH_BUILD_TESTS "Build the independent numerical verification programs" OFF)
 option(CTORCH_BUILD_EXAMPLES "Build the training examples" OFF)
@@ -45,10 +46,12 @@ add_library(ctorch
     src/ops/elementwise.cpp
     src/ops/reduction.cpp
     src/ops/statistics.cpp
+    src/ops/sequence.cpp
     src/ops/matmul.cpp
     src/ops/indexing.cpp
     src/ops/concatenation.cpp
     src/ops/loss.cpp
+    src/ops/objectives.cpp
     src/ops/spatial.cpp
     src/ops/resampling.cpp
     src/ops/convolution.cpp
@@ -61,6 +64,7 @@ add_library(ctorch
     src/kernels/cpu/random.cpp
     src/kernels/cpu/comparison.cpp
     src/kernels/cpu/reduction.cpp
+    src/kernels/cpu/sequence.cpp
     src/kernels/cpu/normalization.cpp
     src/kernels/cpu/batch_normalization.cpp
     src/kernels/cpu/matmul.cpp
@@ -86,7 +90,10 @@ add_library(ctorch
     src/optim/scheduler.cpp
     src/optim/state.cpp
     src/data/loader.cpp
+    src/data/sequence.cpp
     src/data/prefetch.cpp
+    src/training/controls.cpp
+    src/training/metrics.cpp
     src/io/checkpoint.cpp
     src/io/training.cpp
     src/io/training_state.cpp
@@ -101,6 +108,7 @@ add_library(ctorch
     src/api/amp.cpp
     src/api/transfer.cpp
     src/api/statistics.cpp
+    src/api/sequence.cpp
     src/api/spatial.cpp
     src/api/recurrent.cpp
     src/api/optimizer.cpp
@@ -110,6 +118,10 @@ add_library(ctorch
     src/api/state.cpp
 )
 add_library(ctorch::ctorch ALIAS ctorch)
+
+set(THREADS_PREFER_PTHREAD_FLAG TRUE)
+find_package(Threads REQUIRED)
+target_link_libraries(ctorch PRIVATE Threads::Threads)
 
 target_compile_features(ctorch PUBLIC cxx_std_20 PRIVATE c_std_17)
 set_target_properties(ctorch PROPERTIES
@@ -154,8 +166,6 @@ endif()
 
 if(CTORCH_USE_CUDA)
     enable_language(CUDA)
-    set(THREADS_PREFER_PTHREAD_FLAG TRUE)
-    find_package(Threads REQUIRED)
     find_package(CUDAToolkit 12 REQUIRED)
     set_target_properties(ctorch PROPERTIES CUDA_STANDARD 20 CUDA_STANDARD_REQUIRED ON CUDA_EXTENSIONS OFF)
     target_sources(ctorch PRIVATE
@@ -165,6 +175,7 @@ if(CTORCH_USE_CUDA)
         src/kernels/cuda/random.cu
         src/kernels/cuda/comparison.cu
         src/kernels/cuda/reduction.cu
+        src/kernels/cuda/sequence.cu
         src/kernels/cuda/normalization.cu
         src/kernels/cuda/batch_normalization.cu
         src/kernels/cuda/matmul.cpp
@@ -178,9 +189,10 @@ if(CTORCH_USE_CUDA)
     )
     target_compile_definitions(ctorch PRIVATE CTORCH_USE_CUDA)
     # 设备上下文与 cuBLASLt、cuDNN 计算方案使用标准互斥量管理共享状态。
-    target_link_libraries(ctorch PRIVATE CUDA::cudart CUDA::cublas CUDA::cublasLt Threads::Threads)
+    target_link_libraries(ctorch PRIVATE CUDA::cudart CUDA::cublas CUDA::cublasLt)
     if(MSVC)
         target_compile_options(ctorch PRIVATE "$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/utf-8>")
+        set_source_files_properties(src/kernels/cuda/sequence.cu PROPERTIES COMPILE_OPTIONS "-Xcompiler=/Zc:preprocessor")
     endif()
 endif()
 
@@ -204,6 +216,9 @@ endif()
 
 if(CTORCH_USE_NPU)
     add_subdirectory(extensions/npu)
+endif()
+if(CTORCH_USE_ONNX)
+    add_subdirectory(extensions/onnx)
 endif()
 
 configure_package_config_file(cmake/CtorchConfig.cmake.in

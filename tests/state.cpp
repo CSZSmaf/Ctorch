@@ -51,6 +51,22 @@ void legacy_names(dl::io::TrainingCheckpoint& state) {
 
 int main() {
     return test::run([] {
+        dl::Generator data_random(19);
+        dl::data::DataLoader data({dl::arange(7), dl::arange(7)}, {.batch_size = 2, .shuffle = false}, data_random);
+        dl::data::PrefetchLoader pipeline(data, dl::Device::cpu(), 2, true);
+        test::values(pipeline.next()->input, {0, 1});
+        auto pending = pipeline.state_dict();
+        auto position = data.state_dict();
+        auto expected = pipeline.next()->input;
+        pipeline.load_state_dict(pending);
+        data.load_state_dict(position);
+        auto actual = pipeline.next()->input;
+        test::expect(expected.to_vector<float>() == actual.to_vector<float>(), "background prefetch restore");
+        dl::training::EarlyStopping stop({.patience = 2});
+        test::expect(!stop.step(2) && !stop.step(1) && !stop.step(1), "metric improvement");
+        dl::training::EarlyStopping resumed;
+        resumed.load_state_dict(stop.state_dict());
+        test::expect(resumed.step(1), "early stopping restore");
         Registry registry;
         auto parameter = test::tensor({1}, {}, true);
         registry.register_parameter("weight", parameter);

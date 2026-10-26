@@ -51,6 +51,8 @@ const Backend& cpu_backend() {
         .sum_into = cpu::sum_into,
         .amax = cpu::amax,
         .arg_extreme = cpu::arg_extreme,
+        .cumsum = cpu::cumsum,
+        .argsort = cpu::argsort,
         .matmul_into = cpu::matmul_into,
         .softmax = cpu::softmax,
         .softmax_backward = cpu::softmax_backward,

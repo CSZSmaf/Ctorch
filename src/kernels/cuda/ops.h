@@ -42,6 +42,8 @@ TensorData sum(const TensorData& input, const Shape& axes, KeepDim keep);
 void sum_into(TensorData& target, const TensorData& input, const Shape& axes, bool accumulate);
 TensorData amax(const TensorData& input, const Shape& axes, KeepDim keep);
 TensorData arg_extreme(const TensorData& input, Index axis, KeepDim keep, bool maximum);
+TensorData cumsum(const TensorData& input, Index axis, bool reverse);
+TensorData argsort(const TensorData& input, Index axis, bool descending);
 void matmul_into(TensorData& target, const TensorData& a, const TensorData& b, bool accumulate);
 bool linear_into(TensorData& target, const TensorData& input, const TensorData& weight, const TensorData& bias);
 TensorData softmax(const TensorData& input, Index axis, bool logarithmic = false);

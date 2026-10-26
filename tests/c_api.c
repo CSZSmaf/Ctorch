@@ -24,6 +24,17 @@ int main(void) {
     dl_tensor_release(square);
     dl_tensor_release(input);
 
+    options.requires_grad = 0;
+    OK(dl_from_host(values, (dl_shape){dims, 1}, options, &input));
+    OK(dl_cumsum(input, 0, &square));
+    OK(dl_tensor_copy_to_host(square, result));
+    if (result[0] != 1 || result[1] != 3 || result[2] != 6) return 1;
+    dl_tensor_release(square);
+    dl_tensor_list* ordered;
+    OK(dl_topk(input, 2, 0, 1, &ordered));
+    dl_tensor_list_release(ordered);
+    dl_tensor_release(input);
+
     dl_module *model, *layer;
     OK(dl_sequential_create(&model));
     OK(dl_relu_create(&layer));

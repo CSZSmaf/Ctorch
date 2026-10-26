@@ -17,7 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Configure
-        run: cmake -S . -B ../Ctorch-build -DCTORCH_BUILD_TESTS=ON -DCTORCH_BUILD_EXAMPLES=ON -DCMAKE_BUILD_TYPE=${{ matrix.config }} -DBUILD_SHARED_LIBS=${{ matrix.shared }}
+        run: cmake -S . -B ../Ctorch-build -DCTORCH_BUILD_TESTS=ON -DCTORCH_BUILD_EXAMPLES=ON -DCTORCH_USE_ONNX=ON -DCMAKE_BUILD_TYPE=${{ matrix.config }} -DBUILD_SHARED_LIBS=${{ matrix.shared }}
       - name: Build
         run: cmake --build ../Ctorch-build --config ${{ matrix.config }} --parallel 2
       - name: Verify

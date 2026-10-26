@@ -13,10 +13,11 @@ Release 提供对应版本的源码和教程压缩包。源码包使用本地编
 - 动态形状、共享存储视图、广播、索引和一阶反向自动求导。
 - Linear、分组卷积、池化、归一化、Embedding、RNN/GRU/LSTM 与 Transformer。
 - SGD、Adam、AdamW、RMSprop、Adagrad，参数分组、冻结、裁剪与学习率调度。
-- 批次整理、输入预取、微批累计、评估、选模和完整训练状态保存。
+- 后台批次整理、变长序列、分桶与加权采样、输入预取和完整训练状态保存。
+- 加权交叉熵、Focal/Dice/KL 损失、分类与分割指标、早停和 EMA。
 - CUDA、cuBLAS、可选 cuDNN，FP16/BF16 混合精度、融合注意力与激活重算。
 - 显式随机 key、函数式状态、固定执行计划与自定义 VJP。
-- 薄 C17 接口、可选 DLPack 交换与实验性 OpenVINO/NPU 推理扩展。
+- 薄 C17 接口、DLPack 交换、独立 ONNX 导出与实验性 OpenVINO/NPU 推理扩展。
 
 ## 构建
 
@@ -52,9 +53,13 @@ auto gradient = *x.grad();
 | [架构](docs/architecture.md) | 张量、求导、数值层与后端职责 |
 | [张量与梯度](docs/tensors.md) | 类型、布局、别名、算子和梯度生命周期 |
 | [训练](docs/training.md) | 模块、优化器、数据、精度和保存恢复 |
+| [数据加载](docs/data.md) | 多输入、变长序列、后台预取与采样 |
+| [损失函数](docs/objectives.md) | 类别权重、标签平滑、分割与蒸馏 |
+| [训练控制](docs/training-tools.md) | 早停、平台期调度、EMA 与评价指标 |
 | [组合与执行](docs/execution.md) | 函数式状态、随机 key、执行计划与重算 |
 | [扩展](docs/extensions.md) | C17、自定义 VJP 与 DLPack |
 | [NPU 推理](docs/npu.md) | 可选 OpenVINO 请求与输出复用 |
+| [ONNX 导出](docs/onnx.md) | 固定推理图与部署端调用 |
 
 ## 独立验证
 

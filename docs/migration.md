@@ -16,6 +16,10 @@ Ctorch 的张量运算、模块和训练循环使用 C++ 接口。迁移模型�
 | `torch.autocast` | `dl::AutocastGuard`；低精度算子的激活输出采用 FP32 |
 | `GradScaler.step()` 和 `update()` | `scaler.step(optimizer)` 一次完成梯度还原、条件更新与倍率调整 |
 | `torch.compile(model)` | `dl::plan::Graph` 显式建立固定计算图，再调用 `compile()` |
+| `pad_sequence` | `dl::data::pad_sequence` 返回数据、长度和有效位置 mask |
+| `CrossEntropyLoss(weight, label_smoothing)` | `dl::CrossEntropyOptions` 使用相同的加权平均约定 |
+| `ReduceLROnPlateau` | `dl::training::ReduceLROnPlateau` 在验证后接收指标 |
+| ONNX 导出 | 独立 `ctorch::onnx` 模块导出显式固定形状推理图 |
 
 保存的张量在反向前保持原值。设备迁移、状态加载和参数更新安排在前向图之间。先迁移模型，再用迁移后的参数构造优化器。
 

@@ -101,6 +101,19 @@ DL_API Tensor argmax(const Tensor& input);
 DL_API Tensor argmax(const Tensor& input, Index axis, KeepDim keep = KeepDim::no);
 DL_API Tensor argmin(const Tensor& input);
 DL_API Tensor argmin(const Tensor& input, Index axis, KeepDim keep = KeepDim::no);
+
+/// 沿轴累计求和；低精度输入返回 FP32，bool 输入返回 int64。
+DL_API Tensor cumsum(const Tensor& input, Index axis);
+/// 排序按值比较，相等值保持原索引顺序；NaN 在升序末尾、降序开头。
+DL_API Tensor argsort(const Tensor& input, Index axis = -1, bool descending = false);
+struct SortResult { Tensor values, indices; };
+DL_API SortResult sort(const Tensor& input, Index axis = -1, bool descending = false);
+/// 返回沿轴排序后的前 k 项；0 <= k <= size(axis)，indices 为原轴内的 int64 索引。
+DL_API SortResult topk(const Tensor& input, Index k, Index axis = -1, bool largest = true);
+/// padding 从最后一维开始给出 before/after 对，长度为偶数，填充量非负。
+DL_API Tensor pad(const Tensor& input, Shape padding, double value = 0.0);
+/// int64 索引位于 [0, classes)，输出在末尾增加类别轴，默认使用 FP32。
+DL_API Tensor one_hot(const Tensor& indices, Index classes, DType dtype = DType::f32);
 /// 使用最大值平移计算 log(sum(exp(input)))，空归约组的结果为负无穷。
 DL_API Tensor logsumexp(const Tensor& input);
 DL_API Tensor logsumexp(const Tensor& input, Shape axes, KeepDim keep = KeepDim::no);
@@ -199,6 +212,16 @@ DL_API Tensor cross_entropy(const Tensor& logits, const Tensor& labels, LossRedu
 /// 有限 logits 下，全忽略的 sum 为零、mean 为 NaN，两者的输入梯度均为零。
 DL_API Tensor cross_entropy(const Tensor& logits, const Tensor& labels,
                             LossReduction reduction, Index ignore_index);
+
+struct CrossEntropyOptions {
+    LossReduction reduction = LossReduction::mean;
+    std::optional<Index> ignore_index;
+    std::optional<Tensor> weight;
+    double label_smoothing = 0.0;
+};
+/// weight 为同设备、累积 dtype 的非负类别权重；平滑系数位于 [0,1]。
+/// mean 分母为有效标签的类别权重之和；权重作为固定系数参与计算。
+DL_API Tensor cross_entropy(const Tensor& logits, const Tensor& labels, CrossEntropyOptions options);
 /// NLL 接收对数概率，类别轴与标签形状沿用 cross_entropy 的约定。
 DL_API Tensor nll_loss(const Tensor& log_probabilities, const Tensor& labels,
                      LossReduction reduction = LossReduction::mean);
@@ -222,6 +245,24 @@ DL_API Tensor binary_cross_entropy(const Tensor& probability, const Tensor& targ
 /// logits 与 target 同形，target 位于 [0,1]；以稳定 Softplus 计算正负类别损失。
 DL_API Tensor binary_cross_entropy_with_logits(const Tensor& logits, const Tensor& target,
                                               LossReduction reduction = LossReduction::mean);
+
+struct BinaryLossOptions {
+    LossReduction reduction = LossReduction::mean;
+    std::optional<Tensor> weight;
+    std::optional<Tensor> positive_weight;
+};
+/// 两种权重与逐项损失可广播，使用累积 dtype；mean 按全部损失项数归约。
+DL_API Tensor binary_cross_entropy_with_logits(const Tensor& logits, const Tensor& target, BinaryLossOptions options);
+/// 二分类 focal loss，target 为 0/1，gamma 非负，alpha 位于 [0,1]。
+DL_API Tensor focal_loss(const Tensor& logits, const Tensor& target, double gamma = 2.0,
+                        double alpha = 0.25, LossReduction reduction = LossReduction::mean);
+/// probability 与 target 同形，沿给定轴计算 Dice；epsilon 为正，两者均为零时损失为零。
+DL_API Tensor dice_loss(const Tensor& probability, const Tensor& target, Shape axes,
+                       double epsilon = 1e-6, LossReduction reduction = LossReduction::mean);
+/// input 是对数概率，target 为概率或对数概率；mean 对所有元素取平均。
+/// batchmean 可用 sum 归约后除以 batch 大小表达。
+DL_API Tensor kl_div(const Tensor& input, const Tensor& target,
+                     LossReduction reduction = LossReduction::mean, bool log_target = false);
 
 /// NCHW 互相关，weight 为 [out, in/groups, kh, kw]，bias 为可选的 [out]。
 /// groups 整除输入与输出通道；stride、dilation 为正，padding 为非负对称填充。

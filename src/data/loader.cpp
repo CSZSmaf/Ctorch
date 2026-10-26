@@ -61,10 +61,16 @@ DataLoader::DataLoader(Index size, Collate collate, LoaderOptions options, Gener
 
 void DataLoader::reset() {
     cursor_ = 0;
+    order_.resize(static_cast<std::size_t>(size_));
     std::iota(order_.begin(), order_.end(), Index{0});
     if (options_.shuffle) {
         generator_.shuffle(order_);
     }
+}
+
+void DataLoader::reset(std::vector<Index> order) {
+    order_ = std::move(order);
+    cursor_ = 0;
 }
 
 LoaderState DataLoader::state_dict() const { return {options_, order_, cursor_, generator_.state()}; }
@@ -77,7 +83,7 @@ void DataLoader::load_state_dict(const LoaderState& state) {
 }
 
 std::optional<Batch> DataLoader::next() {
-    const auto remaining = size_ - cursor_;
+    const auto remaining = static_cast<Index>(order_.size()) - cursor_;
     if (remaining == 0 || (options_.drop_last && remaining < options_.batch_size)) {
         return std::nullopt;
     }

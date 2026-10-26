@@ -2,6 +2,18 @@
 
 int main() {
     return test::run([] {
+        auto sequence = test::tensor({3, 1, 1, 2, 4, -1}, {2, 3}, true);
+        auto sorted = dl::sort(sequence, 1);
+        test::values(sorted.values, {1, 1, 3, -1, 2, 4});
+        test::expect(sorted.indices.to_vector<dl::Index>() == dl::Shape({1, 2, 0, 2, 0, 1}), "stable sorting");
+        dl::sum(dl::topk(sequence, 2, 1).values).backward();
+        test::gradient(sequence, {1, 1, 0, 1, 1, 0});
+        sequence.zero_grad();
+        test::values(dl::cumsum(sequence.transpose(0, 1), 0), {3, 2, 4, 6, 5, 5});
+        dl::sum(dl::cumsum(sequence, 1)).backward();
+        test::gradient(sequence, {3, 2, 1, 3, 2, 1});
+        test::values(dl::one_hot(test::indices({2, 0}), 3), {0, 0, 1, 1, 0, 0});
+
         auto scalar = dl::full({}, 1.5, {.dtype = dl::DType::f64, .requires_grad = true});
         test::close(scalar.item<float>(), 1.5);
         test::close(scalar.astype(dl::DType::f32).item<double>(), 1.5);

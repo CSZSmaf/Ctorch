@@ -137,6 +137,8 @@ VarianceResult variance(const TensorData& input, const Shape& axes, double corre
 void sum_into(TensorData& target, const TensorData& input, const Shape& axes, bool accumulate);
 TensorData amax(const TensorData& input, const Shape& axes, KeepDim keep);
 TensorData arg_extreme(const TensorData& input, Index axis, KeepDim keep, bool maximum);
+TensorData cumsum(const TensorData& input, Index axis, bool reverse = false);
+TensorData argsort(const TensorData& input, Index axis, bool descending);
 TensorData sum_to_shape(const TensorData& input, Shape shape);
 void sum_to_shape_into(TensorData& target, const TensorData& input, bool accumulate);
 /// 两个操作数均已具有矩阵维；向量补维由公开 matmul 处理。

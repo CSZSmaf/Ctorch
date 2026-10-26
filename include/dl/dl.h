@@ -17,4 +17,5 @@
 #include "dl/random.h"
 #include "dl/tensor.h"
 #include "dl/transfer.h"
+#include "dl/training.h"
 #include "dl/version.h"

@@ -43,6 +43,8 @@ numeric::VarianceResult variance(const TensorData& input, const Shape& axes, dou
 void sum_into(TensorData& target, const TensorData& input, const Shape& axes, bool accumulate);
 TensorData amax(const TensorData& input, const Shape& axes, KeepDim keep);
 TensorData arg_extreme(const TensorData& input, Index axis, KeepDim keep, bool maximum);
+TensorData cumsum(const TensorData& input, Index axis, bool reverse);
+TensorData argsort(const TensorData& input, Index axis, bool descending);
 void matmul_into(TensorData& target, const TensorData& a, const TensorData& b, bool accumulate);
 TensorData softmax(const TensorData& input, Index axis, bool logarithmic = false);
 TensorData softmax_backward(const TensorData& grad, const TensorData& output, Index axis, bool logarithmic);

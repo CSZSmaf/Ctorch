@@ -54,6 +54,8 @@ struct Backend {
     void (*sum_into)(TensorData&, const TensorData&, const Shape&, bool);
     TensorData (*amax)(const TensorData&, const Shape&, KeepDim);
     TensorData (*arg_extreme)(const TensorData&, Index, KeepDim, bool);
+    TensorData (*cumsum)(const TensorData&, Index, bool);
+    TensorData (*argsort)(const TensorData&, Index, bool);
     void (*matmul_into)(TensorData&, const TensorData&, const TensorData&, bool);
     // 可选的矩阵乘加偏置实现；返回 false 时由数值层组合原有操作。
     bool (*linear_into)(TensorData&, const TensorData&, const TensorData&, const TensorData&) = nullptr;

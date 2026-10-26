@@ -41,6 +41,8 @@ const Backend& cuda_backend() {
         .sum_into = cuda::sum_into,
         .amax = cuda::amax,
         .arg_extreme = cuda::arg_extreme,
+        .cumsum = cuda::cumsum,
+        .argsort = cuda::argsort,
         .matmul_into = cuda::matmul_into,
         .linear_into = cuda::linear_into,
         .softmax = cuda::softmax,

@@ -13,12 +13,12 @@
 namespace dl::io {
 namespace {
 
-constexpr std::array<char, 8> format{'C', 'T', 'R', 'A', 'I', 'N', 0, 6};
+constexpr std::array<char, 8> format{'C', 'T', 'R', 'A', 'I', 'N', 0, 7};
 
 int read_training_header(std::istream& input) {
     std::array<char, 8> header;
     input.read(header.data(), header.size());
-    if (!std::equal(format.begin(), format.end() - 1, header.begin()) || header[7] < 1 || header[7] > 6) {
+    if (!std::equal(format.begin(), format.end() - 1, header.begin()) || header[7] < 1 || header[7] > 7) {
         throw std::runtime_error("unsupported training checkpoint format");
     }
     return header[7];
@@ -232,32 +232,34 @@ FunctionalTrainingState restore_checkpoint(const TrainingCheckpoint& checkpoint,
 TrainingCheckpoint capture_checkpoint(const nn::Module& model, const optim::Optimizer& optimizer,
     TrainingProgress progress, const data::PrefetchLoader& loader, std::span<const NamedGenerator> generators,
     std::span<const NamedScheduler> schedulers, const GradScaler* scaler) {
+    auto pending = loader.state_dict();
     auto result = capture_checkpoint(model, optimizer, progress, &loader.source(), generators, schedulers, scaler);
-    result.prefetch = loader.state_dict();
+    result.prefetch = std::move(pending);
     return result;
 }
 
 TrainingProgress restore_checkpoint(const TrainingCheckpoint& checkpoint, nn::Module& model,
     optim::Optimizer& optimizer, data::PrefetchLoader& loader, std::span<const NamedGenerator> generators,
     std::span<const NamedScheduler> schedulers, GradScaler* scaler) {
-    auto progress = restore_checkpoint(checkpoint, model, optimizer, &loader.source(), generators, schedulers, scaler);
     loader.load_state_dict(checkpoint.prefetch.value_or(data::PrefetchState{}));
+    auto progress = restore_checkpoint(checkpoint, model, optimizer, &loader.source(), generators, schedulers, scaler);
     return progress;
 }
 
 TrainingCheckpoint capture_checkpoint(const nn::FunctionalModule& functional, const nn::FunctionalState& state,
     const optim::OptimizerState& optimizer, RandomKey random_key, TrainingProgress progress,
     const data::PrefetchLoader& loader, std::span<const NamedGenerator> generators, const GradScaler* scaler) {
+    auto pending = loader.state_dict();
     auto result = capture_checkpoint(functional, state, optimizer, random_key, progress, &loader.source(), generators, scaler);
-    result.prefetch = loader.state_dict();
+    result.prefetch = std::move(pending);
     return result;
 }
 
 FunctionalTrainingState restore_checkpoint(const TrainingCheckpoint& checkpoint,
     const nn::FunctionalModule& functional, Device device, data::PrefetchLoader& loader,
     std::span<const NamedGenerator> generators, GradScaler* scaler) {
-    auto result = restore_checkpoint(checkpoint, functional, device, &loader.source(), generators, scaler);
     loader.load_state_dict(checkpoint.prefetch.value_or(data::PrefetchState{}));
+    auto result = restore_checkpoint(checkpoint, functional, device, &loader.source(), generators, scaler);
     return result;
 }
 
@@ -295,9 +297,11 @@ void save_checkpoint(const std::filesystem::path& path, const TrainingCheckpoint
     write_integer(output, static_cast<std::uint8_t>(checkpoint.prefetch.has_value()));
     if (checkpoint.prefetch) {
         write_integer(output, static_cast<std::uint64_t>(checkpoint.prefetch->depth));
+        write_integer(output, static_cast<std::uint8_t>(checkpoint.prefetch->background));
         write_integer(output, static_cast<std::uint64_t>(checkpoint.prefetch->pending.size()));
         for (const auto& batch : checkpoint.prefetch->pending) {
-            const std::array<NamedTensor, 2> values{{{"input", batch.input}, {"target", batch.target}}};
+            StateDict values{{"input", batch.input}, {"target", batch.target}};
+            for (std::size_t i = 0; i < batch.extra.size(); ++i) values.emplace_back("extra." + std::to_string(i), batch.extra[i]);
             write_state(output, values);
         }
     }
@@ -350,10 +354,13 @@ TrainingCheckpoint load_checkpoint(const std::filesystem::path& path) {
     if (version >= 3 && read_integer<std::uint8_t>(input) != 0) {
         data::PrefetchState state;
         state.depth = static_cast<std::size_t>(read_integer<std::uint64_t>(input));
+        if (version >= 7) state.background = read_integer<std::uint8_t>(input) != 0;
         const auto count = read_integer<std::uint64_t>(input);
         for (std::uint64_t index = 0; index < count; ++index) {
             auto values = read_state(input);
-            state.pending.push_back({std::move(values[0].second), std::move(values[1].second)});
+            data::Batch batch{std::move(values[0].second), std::move(values[1].second), {}};
+            for (std::size_t i = 2; i < values.size(); ++i) batch.extra.push_back(std::move(values[i].second));
+            state.pending.push_back(std::move(batch));
         }
         result.prefetch = std::move(state);
     }
@@ -362,6 +369,21 @@ TrainingCheckpoint load_checkpoint(const std::filesystem::path& path) {
     if (version >= 6 && read_integer<std::uint8_t>(input) != 0) {
         result.random_key = RandomKey{read_integer<std::uint64_t>(input), read_integer<std::uint64_t>(input)};
     }
+    return result;
+}
+
+void set_extra(TrainingCheckpoint& checkpoint, std::string_view name, std::span<const NamedTensor> state) {
+    const auto prefix = std::string(name) + ".";
+    auto copy = clone_state(state);
+    std::erase_if(checkpoint.extra, [&](const auto& entry) { return entry.first.starts_with(prefix); });
+    for (auto& [key, tensor] : copy) checkpoint.extra.emplace_back(prefix + key, std::move(tensor));
+}
+
+StateDict get_extra(const TrainingCheckpoint& checkpoint, std::string_view name) {
+    const auto prefix = std::string(name) + ".";
+    StateDict result;
+    for (const auto& [key, tensor] : checkpoint.extra)
+        if (key.starts_with(prefix)) result.emplace_back(key.substr(prefix.size()), tensor);
     return result;
 }
 

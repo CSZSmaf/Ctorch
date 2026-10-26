@@ -53,6 +53,10 @@ struct TrainingCheckpoint {
     std::optional<RandomKey> random_key;
 };
 
+/// 以非空命名空间保存训练工具状态。set_extra 复制独立 CPU 值，替换该名称下的旧状态。
+DL_API void set_extra(TrainingCheckpoint& checkpoint, std::string_view name, std::span<const NamedTensor> state);
+DL_API StateDict get_extra(const TrainingCheckpoint& checkpoint, std::string_view name);
+
 /// 在一次更新完成后采集状态；参数按模型的规范名称关联，默认随机流一并保存。
 DL_API TrainingCheckpoint capture_checkpoint(const nn::Module& model, const optim::Optimizer& optimizer,
     TrainingProgress progress = {}, const data::DataLoader* loader = nullptr,

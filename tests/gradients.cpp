@@ -4,6 +4,17 @@ using test::directional_check;
 
 int main() {
     return test::run([] {
+        directional_check({-.7, .2, 1.2, -1.1, .5, .9}, {2, 3}, [](const auto& x) {
+            return dl::sum(dl::pad(x.transpose(0, 1), {1, 2, 2, 0}, .5) * .7);
+        });
+        directional_check({-.7, .2, 1.2, -1.1, .5, .9}, {2, 3}, [](const auto& x) {
+            return dl::cross_entropy(x, test::indices({2, 0}), dl::CrossEntropyOptions{
+                .weight = test::tensor({.5, 2, 1}, {3}), .label_smoothing = .1});
+        });
+        directional_check({-.7, .2, 1.2, -1.1, .5, .9}, {2, 3}, [](const auto& x) {
+            auto target = test::tensor({0, 1, 1, 0, 1, 0}, {2, 3});
+            return dl::focal_loss(x, target) + dl::dice_loss(dl::sigmoid(x), target, {1});
+        });
         // 常量长向量的均值保持常量，归一化输出及其和的梯度都为零。
         for (dl::Index width : {1001, 4096}) {
             for (float value : {0.1f, 1.1f, 10.1f, 1e6f}) {

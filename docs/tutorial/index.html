@@ -253,7 +253,8 @@ batches.reset();
 while (auto batch = batches.next()) {
     auto prediction = model(batch-&gt;input);
 }</code></pre>
-        <p><code>device</code> 是模型所在设备。预取器提前准备有限数量的批次，并复用 CPU 暂存缓冲区。使用预取器时，通过它调用 <code>reset()</code> 和 <code>next()</code>。collate 在调用线程执行，不会自动创建多进程读取器。保存预取训练状态的方法见<a href="#state-resume">保存训练状态</a>。</p>
+        <p><code>device</code> 是模型所在设备。预取器提前准备批次，并复用 CPU 暂存缓冲区。通过它调用 <code>reset()</code> 和 <code>next()</code>。第四个参数设为 <code>true</code> 时，用一个后台 CPU 线程执行 collate。保存预取训练状态的方法见<a href="#state-resume">保存训练状态</a>。</p>
+        <p>多输入、变长序列和采样方法见<a href="../data.md">数据加载手册</a>。完整应用见<a href="../projects/variable-length.md">变长文本分类</a>。</p>
       </article>
 
       <article class="lesson" id="models" data-title="常用模型" data-description="Sequential 可以组合按顺序执行的层。分支、残差连接和多输入模型使用自定义 Module。">

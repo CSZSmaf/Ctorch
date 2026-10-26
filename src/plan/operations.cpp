@@ -23,15 +23,17 @@ OutputSpec dropout_spec(const TensorSpec& input, double probability, bool traini
 TensorSpec key_spec() { return contiguous_spec({2}, DType::i64); }
 
 Operation binary(std::string name, Tensor (*execute)(const Tensor&, const Tensor&)) {
-    return {std::move(name), [](std::span<const TensorSpec> inputs) {
+    return {name, [](std::span<const TensorSpec> inputs) {
         return OutputSpec{contiguous_spec(detail::broadcast_shape(inputs[0].shape, inputs[1].shape),
             accumulation_dtype(inputs[0].dtype), inputs[0].device), std::nullopt};
-    }, [execute](std::span<const Tensor> inputs) { return execute(inputs[0], inputs[1]); }};
+    }, [execute](std::span<const Tensor> inputs) { return execute(inputs[0], inputs[1]); },
+        Effect::none, Semantic::custom, {std::move(name), {}}};
 }
 
 Operation unary(std::string name, Tensor (*execute)(const Tensor&)) {
-    return {std::move(name), [](std::span<const TensorSpec> inputs) { return dense(inputs[0]); },
-        [execute](std::span<const Tensor> inputs) { return execute(inputs[0]); }};
+    return {name, [](std::span<const TensorSpec> inputs) { return dense(inputs[0]); },
+        [execute](std::span<const Tensor> inputs) { return execute(inputs[0]); },
+        Effect::none, Semantic::custom, {std::move(name), {}}};
 }
 
 struct BatchInputs {
@@ -59,12 +61,31 @@ Operation add() {
 }
 Operation add_relu() { return binary("add_relu", dl::add_relu); }
 Operation mul() { return binary("mul", dl::mul); }
+Operation sub() { return binary("sub", dl::sub); }
+Operation div() { return binary("div", dl::div); }
+Operation sigmoid() { return unary("sigmoid", dl::sigmoid); }
+Operation tanh() { return unary("tanh", dl::tanh); }
 Operation relu() {
     auto operation = unary("relu", dl::relu);
     operation.semantic = Semantic::relu;
     return operation;
 }
 Operation silu() { return unary("silu", dl::silu); }
+
+Operation softmax(Index axis) {
+    return {"softmax", [](std::span<const TensorSpec> inputs) { return dense(inputs[0]); },
+        [axis](std::span<const Tensor> inputs) { return dl::softmax(inputs[0], axis); },
+        Effect::none, Semantic::custom, {"softmax", {{"axis", axis}}}};
+}
+
+Operation layer_norm(Shape shape, double epsilon) {
+    return {"layer_norm", [](std::span<const TensorSpec> inputs) { return dense(inputs[0]); },
+        [shape, epsilon](std::span<const Tensor> inputs) {
+            return dl::layer_norm(inputs[0], shape, inputs.size() > 1 ? std::optional{inputs[1]} : std::nullopt,
+                inputs.size() > 2 ? std::optional{inputs[2]} : std::nullopt, epsilon);
+        }, Effect::none, Semantic::custom,
+        {"layer_norm", {{"axis", -static_cast<Index>(shape.size())}, {"epsilon", epsilon}}}};
+}
 
 Operation attention(AttentionComputeOptions options, bool masked, bool keyed) {
     return {"attention", [options](std::span<const TensorSpec> inputs) {
@@ -103,7 +124,8 @@ Operation matmul() {
         if (!left_vector) shape.push_back(left[left.size() - 2]);
         if (!right_vector) shape.push_back(right.back());
         return OutputSpec{contiguous_spec(std::move(shape), accumulation_dtype(a.dtype), a.device), std::nullopt};
-    }, [](std::span<const Tensor> inputs) { return dl::matmul(inputs[0], inputs[1]); }};
+    }, [](std::span<const Tensor> inputs) { return dl::matmul(inputs[0], inputs[1]); },
+        Effect::none, Semantic::custom, {"matmul", {}}};
 }
 
 Operation linear() {
@@ -114,7 +136,7 @@ Operation linear() {
     }, [](std::span<const Tensor> inputs) {
         const auto bias = inputs.size() == 3 ? std::optional{inputs[2]} : std::nullopt;
         return dl::linear(inputs[0], inputs[1], bias);
-    }};
+    }, Effect::none, Semantic::custom, {"linear", {}}};
 }
 
 Operation reshape(Shape shape) {
@@ -126,7 +148,8 @@ Operation reshape(Shape shape) {
         result.shape = std::move(target);
         result.strides = std::move(*strides);
         return OutputSpec{std::move(result), 0};
-    }, [shape](std::span<const Tensor> inputs) { return inputs[0].reshape(shape); }};
+    }, [shape](std::span<const Tensor> inputs) { return inputs[0].reshape(shape); },
+        Effect::none, Semantic::custom, {"reshape", {}}};
 }
 
 Operation transpose(Index first, Index second) {
@@ -137,7 +160,8 @@ Operation transpose(Index first, Index second) {
         std::swap(result.shape[a], result.shape[b]);
         std::swap(result.strides[a], result.strides[b]);
         return OutputSpec{std::move(result), 0};
-    }, [first, second](std::span<const Tensor> inputs) { return inputs[0].transpose(first, second); }};
+    }, [first, second](std::span<const Tensor> inputs) { return inputs[0].transpose(first, second); },
+        Effect::none, Semantic::custom, {"transpose", {{"axes", Shape{first, second}}}}};
 }
 
 Operation contiguous() {
@@ -145,7 +169,8 @@ Operation contiguous() {
         const auto& input = inputs[0];
         return input.is_contiguous() ? OutputSpec{input, 0}
             : OutputSpec{contiguous_spec(input.shape, input.dtype, input.device), std::nullopt};
-    }, [](std::span<const Tensor> inputs) { return inputs[0].contiguous(); }};
+    }, [](std::span<const Tensor> inputs) { return inputs[0].contiguous(); },
+        Effect::none, Semantic::custom, {"identity", {}}};
 }
 
 Operation dropout(double probability, bool training) {
@@ -154,7 +179,8 @@ Operation dropout(double probability, bool training) {
         return dropout_spec(inputs[0], probability, training);
     }, [probability, training](std::span<const Tensor> inputs) {
         return dl::dropout(inputs[0], probability, training);
-    }, !identity && probability < 1.0 ? Effect::random : Effect::none};
+    }, !identity && probability < 1.0 ? Effect::random : Effect::none, Semantic::custom,
+        identity ? OperatorInfo{"identity", {}} : OperatorInfo{}};
 }
 
 Operation batch_norm(BatchNormOptions options, bool training) {
@@ -167,7 +193,9 @@ Operation batch_norm(BatchNormOptions options, bool training) {
             }
             return dl::batch_norm(inputs[0], std::nullopt, bound.weight, bound.bias,
                 training, options.momentum, options.epsilon).output;
-        }, training && options.track_running_stats ? Effect::mutation : Effect::none};
+        }, training && options.track_running_stats ? Effect::mutation : Effect::none, Semantic::custom,
+        {"batch_norm", {{"training", Index(training)}, {"track", Index(options.track_running_stats)},
+            {"affine", Index(options.affine)}, {"epsilon", options.epsilon}}}};
 }
 
 MultiOperation functional_batch_norm(BatchNormOptions options, bool training) {

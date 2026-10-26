@@ -284,6 +284,13 @@ DL_API dl_status dl_argmax(const dl_tensor* input, int64_t axis, int32_t keepdim
 DL_API dl_status dl_argmax_all(const dl_tensor* input, dl_tensor** output);
 DL_API dl_status dl_argmin(const dl_tensor* input, int64_t axis, int32_t keepdim, dl_tensor** output);
 DL_API dl_status dl_argmin_all(const dl_tensor* input, dl_tensor** output);
+DL_API dl_status dl_cumsum(const dl_tensor* input, int64_t axis, dl_tensor** output);
+DL_API dl_status dl_argsort(const dl_tensor* input, int64_t axis, int32_t descending, dl_tensor** output);
+/* 排序结果列表依次包含 values、indices；相等值按原索引排列。 */
+DL_API dl_status dl_sort(const dl_tensor* input, int64_t axis, int32_t descending, dl_tensor_list** output);
+DL_API dl_status dl_topk(const dl_tensor* input, int64_t k, int64_t axis, int32_t largest, dl_tensor_list** output);
+DL_API dl_status dl_pad(const dl_tensor* input, dl_shape padding, double value, dl_tensor** output);
+DL_API dl_status dl_one_hot(const dl_tensor* input, int64_t classes, dl_dtype dtype, dl_tensor** output);
 DL_API dl_status dl_logsumexp(const dl_tensor* input, dl_shape axes, int32_t keepdim, dl_tensor** output);
 DL_API dl_status dl_logsumexp_all(const dl_tensor* input, dl_tensor** output);
 /* 方差分母为 N-correction，N > correction >= 0；标准差的常数组梯度为零。 */
@@ -335,6 +342,18 @@ DL_API dl_status dl_binary_cross_entropy_with_logits(const dl_tensor* logits, co
     dl_loss_reduction reduction, dl_tensor** output);
 DL_API dl_status dl_binary_cross_entropy(const dl_tensor* probability, const dl_tensor* target,
     dl_loss_reduction reduction, dl_tensor** output);
+/* 权重可为 NULL；ignore_index 可为 NULL，label_smoothing 在 [0,1] 内。 */
+DL_API dl_status dl_cross_entropy_weighted(const dl_tensor* logits, const dl_tensor* labels,
+    const dl_tensor* weight, double label_smoothing, const int64_t* ignore_index,
+    dl_loss_reduction reduction, dl_tensor** output);
+DL_API dl_status dl_binary_cross_entropy_weighted(const dl_tensor* logits, const dl_tensor* target,
+    const dl_tensor* weight, const dl_tensor* positive_weight, dl_loss_reduction reduction, dl_tensor** output);
+DL_API dl_status dl_focal_loss(const dl_tensor* logits, const dl_tensor* target, double gamma, double alpha,
+    dl_loss_reduction reduction, dl_tensor** output);
+DL_API dl_status dl_dice_loss(const dl_tensor* probability, const dl_tensor* target, dl_shape axes,
+    double epsilon, dl_loss_reduction reduction, dl_tensor** output);
+DL_API dl_status dl_kl_div(const dl_tensor* log_input, const dl_tensor* target, dl_loss_reduction reduction,
+    int32_t log_target, dl_tensor** output);
 DL_API dl_status dl_conv2d(const dl_tensor* input, const dl_tensor* weight, const dl_tensor* bias,
     dl_conv2d_options options, dl_tensor** output);
 DL_API dl_status dl_max_pool2d(const dl_tensor* input, dl_pool2d_options options, dl_tensor** output);
@@ -741,6 +760,8 @@ DL_API dl_status dl_transfer_wait(const dl_transfer* transfer);
 
 /* 预取器保留源 loader 和生成器的所有权，depth 为正；迭代与重置通过预取器执行。 */
 DL_API dl_status dl_prefetch_loader_create(dl_loader* source, dl_device target, size_t depth, dl_prefetch_loader** output);
+DL_API dl_status dl_prefetch_loader_create_background(dl_loader* source, dl_device target, size_t depth,
+    dl_prefetch_loader** output);
 DL_API void dl_prefetch_loader_release(dl_prefetch_loader* loader);
 DL_API dl_status dl_prefetch_loader_next(dl_prefetch_loader* loader, dl_tensor** input, dl_tensor** target);
 DL_API dl_status dl_prefetch_loader_reset(dl_prefetch_loader* loader);

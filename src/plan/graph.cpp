@@ -66,7 +66,7 @@ std::vector<TensorSpec> Graph::input_specs(std::span<const Value> inputs) const 
 }
 
 std::vector<Value> Graph::append(std::string name, Invocation execute, Effect effect, Semantic semantic,
-    std::span<const Value> inputs, std::vector<OutputSpec> outputs) {
+    std::span<const Value> inputs, std::vector<OutputSpec> outputs, OperatorInfo description) {
     std::vector<Value> results;
     results.reserve(outputs.size());
     for (auto& output : outputs) {
@@ -77,20 +77,28 @@ std::vector<Value> Graph::append(std::string name, Invocation execute, Effect ef
         values_.push_back({std::move(output.tensor), alias});
     }
     nodes_.push_back({std::move(name), std::move(execute), effect, semantic,
-        {inputs.begin(), inputs.end()}, results});
+        {inputs.begin(), inputs.end()}, results, std::move(description)});
     return results;
 }
 
 Value Graph::call(Operation operation, std::span<const Value> inputs) {
     auto output = operation.infer(input_specs(inputs));
     return append(std::move(operation.name), std::move(operation.execute), operation.effect, operation.semantic,
-        inputs, {std::move(output)})[0];
+        inputs, {std::move(output)}, std::move(operation.description))[0];
 }
 
 std::vector<Value> Graph::call(MultiOperation operation, std::span<const Value> inputs) {
     auto outputs = operation.infer(input_specs(inputs));
     return append(std::move(operation.name), std::move(operation.execute), operation.effect, Semantic::custom,
         inputs, std::move(outputs));
+}
+
+GraphInfo Graph::describe() const {
+    GraphInfo info;
+    for (const auto& value : values_) info.values.push_back(value.spec);
+    for (const auto& input : inputs_) info.inputs.emplace_back(input.value, input.name);
+    for (const auto& node : nodes_) info.nodes.push_back({node.name, node.description, node.effect, node.inputs, node.outputs});
+    return info;
 }
 
 ExecutionPlan Graph::compile(std::span<const Value> outputs, CompileOptions options) const {

@@ -1,6 +1,6 @@
 # 项目教程
 
-这组项目使用公开数据训练模型，包含数据读取、训练、验证、保存、恢复和预测。先完成基础教程中的[训练](../tutorial/index.html#training)与[保存恢复](../tutorial/index.html#state)，再选择一个项目运行。
+这组项目介绍图像分类、文本生成、变长文本分类和分割。数据包括公开数据集、自备 TSV 文本与程序生成的图像。先完成基础教程中的[训练](../tutorial/index.html#training)与[保存恢复](../tutorial/index.html#state)，再选择一个项目运行。
 
 | 项目 | 数据与任务 | 参数量 | 主要内容 |
 | --- | --- | ---: | --- |
@@ -8,6 +8,8 @@
 | [MNIST LeNet](mnist.md#lenet) | 手写数字分类 | 44,426 | 卷积、池化、特征尺寸计算 |
 | [CIFAR-10 ResNet-20](resnet.md) | 彩色图像分类 | 272,474 | 残差模块、BatchNorm、分阶段降采样 |
 | [Shakespeare Transformer](transformer.md) | 下一个字节预测与文本生成 | 842,496 | 因果注意力、共享词表、梯度裁剪、自回归生成 |
+| [二值图像分割](segmentation.md) | 带噪声圆形图像的逐像素分类 | 777 | 跳跃连接、Dice、IoU 和 EMA |
+| [变长文本分类](variable-length.md) | TSV 文本与整数标签 | 随类别数变化 | 序列填充、mask、长度分桶和后台整理 |
 
 MLP 和 LeNet 适合第一次运行真实数据训练。ResNet 和 Transformer 使用更多模块，适合练习如何组织一个完整的单机训练项目。[框架结果对比](comparison.md)提供 Ctorch、PyTorch 和 TensorFlow 的实际训练结果、数值误差与 CPU 推理耗时。
 
@@ -31,7 +33,7 @@ cmake -S . -B ../Ctorch-work/build-gpu -G Ninja -DCMAKE_BUILD_TYPE=Release -DCTO
 cmake --build ../Ctorch-work/build-gpu
 ```
 
-CUDA、cuDNN 的依赖和路径设置见[构建手册](../build.md)。随后把项目命令中的 `build/bin` 改为 `build-gpu/bin`，并追加 `--device 0`。项目中的实测训练使用 FP32；`--precision bf16` 或 `--precision f16` 可以另行启用混合精度。
+CUDA、cuDNN 的依赖和路径设置见[构建手册](../build.md)。各项目页面提供完整运行命令。MNIST、ResNet 与 Transformer 使用 `--device 0` 选择 GPU，可通过 `--precision bf16` 或 `--precision f16` 启用混合精度。分割和变长文本分类示例使用 FP32，最后一个参数为 `cpu` 或 `cuda`。
 
 ## 获取数据
 

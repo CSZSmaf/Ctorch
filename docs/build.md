@@ -23,6 +23,7 @@ cmake --build --preset shared
 | CTORCH_USE_CUDNN | CUDA、cuDNN 9.7+、cuDNN frontend 1.12+ |
 | CTORCH_USE_DLPACK | 官方 DLPack 1.x 头文件 |
 | CTORCH_USE_NPU | OpenVINO 2026.0+ Runtime，构建独立推理扩展 |
+| CTORCH_USE_ONNX | 构建独立 ONNX 导出模块，无额外运行库依赖 |
 | CTORCH_BUILD_EXAMPLES | 构建 C/C++ 接口与训练示例 |
 | CTORCH_BUILD_TESTS | 构建独立的核心正确性检查，使用 CTest 运行 |
 

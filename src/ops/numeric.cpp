@@ -178,6 +178,13 @@ TensorData amax(const TensorData& input, const Shape& axes, KeepDim keep) {
 TensorData arg_extreme(const TensorData& input, Index axis, KeepDim keep, bool maximum) {
     return backend(input.device()).arg_extreme(compute(input), axis, keep, maximum);
 }
+TensorData cumsum(const TensorData& input, Index axis, bool reverse) {
+    const auto dtype = input.dtype == DType::boolean ? DType::i64 : accumulation_dtype(input.dtype);
+    return backend(input.device()).cumsum(cast(input, dtype), axis, reverse);
+}
+TensorData argsort(const TensorData& input, Index axis, bool descending) {
+    return backend(input.device()).argsort(input, axis, descending);
+}
 Shape matmul_shape(const TensorData& a, const TensorData& b) {
     const auto left = std::span<const Index>(a.layout.sizes), right = std::span<const Index>(b.layout.sizes);
     auto shape = broadcast_shape(left.first(left.size() - 2), right.first(right.size() - 2));

@@ -5,7 +5,6 @@
 #include <stdexcept>
 #include <type_traits>
 
-struct dl_graph { dl::plan::Graph value; };
 struct dl_plan_operation { std::variant<dl::plan::Operation, dl::plan::MultiOperation> value; };
 struct dl_plan_values { std::vector<dl::plan::Value> value; };
 struct dl_execution_plan { dl::plan::ExecutionPlan value; };

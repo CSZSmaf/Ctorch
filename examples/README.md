@@ -18,6 +18,9 @@ cmake --build --preset cpu
 | ctorch_byte_transformer | 本地文本文件 | 字节/位置 Embedding、因果 Transformer、共享词表权重 |
 | ctorch_shakespeare_transformer | 本地文本文件 | 4 层、宽度 128、上下文 128 的 Transformer |
 | ctorch_text_generate | 文本模型权重与前缀 | 自回归字节采样 |
+| ctorch_variable_length | 训练与验证 TSV 文件 | 字节 Embedding、带 mask 的平均池化与分类 |
+
+[二值分割示例](../docs/projects/segmentation.md)使用程序生成的带噪声图像，运行 `ctorch_segmentation <output-directory> [cpu|cuda]`。它演示分割损失、IoU、EMA 和训练工具状态保存。
 
 ```text
 ctorch_mnist_mlp <mnist-directory> <output-directory> [--device cpu|index] [--epochs N] [--batch-size N]
@@ -50,5 +53,7 @@ MNIST 目录包含标准解压文件名，像素缩放到 `[0,1]`。训练集前
 | [cuda_memory.cpp](cuda_memory.cpp) | CUDA 内存池使用与回收 |
 | [cudnn_attention.cpp](cudnn_attention.cpp) | BF16 因果 Transformer 与 cuDNN SDPA |
 | [dlpack_vjp.cpp](dlpack_vjp.cpp) / [c_dlpack.c](c_dlpack.c) | DLPack 共享视图与外部计算 |
+| [segmentation.cpp](segmentation.cpp) / [variable_length.cpp](variable_length.cpp) | 二值分割与变长文本批次 |
+| [export_onnx.cpp](export_onnx.cpp) | 显式推理图导出，需启用 `CTORCH_USE_ONNX` |
 
 源码目标使用 `ctorch_` 前缀；`installed` 工程使用相同示例文件，只通过安装包链接。CUDA、cuDNN 和 DLPack 专用示例随对应构建选项启用。

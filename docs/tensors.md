@@ -61,10 +61,15 @@ shape、stride 和 storage offset 共同决定地址。广播按末尾维对齐�
 - sum、mean、amax、softmax、logsumexp 和统计归约。
 - matmul、linear、卷积、池化、插值与归一化。
 - concat、stack、unbind、repeat、gather、scatter_add 与 Embedding。
-- 分类交叉熵、二分类损失、MSE、L1、SmoothL1 与 Huber。
+- cumsum、稳定排序、topk、常量填充和 one_hot。
+- 加权交叉熵、二分类损失、Focal、Dice、KL、MSE、L1、SmoothL1 与 Huber。
 - RNN、GRU、LSTM 和缩放点积注意力。
 
 矩阵乘支持向量和批维广播。分类标签采用 int64，交叉熵的 `ignore_index` 不参与 mean 分母。CPU f64 与低精度路径遵循各自的累积类型。
+
+`cumsum(x, axis)` 返回该轴的前缀和，反向计算后缀和。低精度输入累积为 FP32，布尔输入累积为 int64。`sort` 和 `topk` 返回包含 `values` 与 int64 `indices` 的结构；相同值按原索引排序，NaN 升序在末尾、降序在开头。梯度传回被选择的原位置。`topk` 当前通过排序选取前 k 项。
+
+`pad(x, {left, right, top, bottom}, value)` 从最后一维起依次给出两侧填充量，填充量为非负整数。`one_hot(indices, classes)` 在整数索引末尾增加类别轴，默认输出 FP32。数据批次的序列填充见[数据加载](data.md)，损失用法见[损失函数](objectives.md)。
 
 ## 一阶求导
 

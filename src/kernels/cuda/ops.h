@@ -48,6 +48,8 @@ void matmul_into(TensorData& target, const TensorData& a, const TensorData& b, b
 bool linear_into(TensorData& target, const TensorData& input, const TensorData& weight, const TensorData& bias);
 TensorData softmax(const TensorData& input, Index axis, bool logarithmic = false);
 TensorData softmax_backward(const TensorData& grad, const TensorData& output, Index axis, bool logarithmic);
+void attention_softmax_inplace(TensorData& scores, float scale, Index first);
+TensorData attention_softmax_backward(const TensorData& grad, const TensorData& weights, float scale);
 void normalization(const TensorData& input, const std::optional<TensorData>& weight,
     const std::optional<TensorData>& bias, Index width, double epsilon,
     numeric::NormalizationKind kind, numeric::NormalizationResult& result);

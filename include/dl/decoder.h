@@ -79,6 +79,7 @@ private:
 /// PreNorm 层组合 RMSNorm、因果 GQA、SwiGLU 与两次残差相加。
 class DL_API TransformerDecoderLayer : public UnaryModule {
 public:
+    static constexpr double norm_epsilon = 1e-5;
     TransformerDecoderLayer(Index dimensions, Index heads, Index kv_heads, Index hidden,
                             Index context, TensorOptions options = {});
     Tensor forward(const Tensor& input) override;
@@ -97,6 +98,7 @@ public:
                        Index context, TensorOptions options = {});
     Tensor forward(const Tensor& input) override;
     std::vector<KVCache> make_cache() const;
+    Index layer_count() const { return static_cast<Index>(layers_.size()); }
     Tensor decode(const Tensor& input, std::span<KVCache> cache);
 private:
     Index context_;

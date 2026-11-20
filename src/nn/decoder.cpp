@@ -1,6 +1,7 @@
 #include "dl/decoder.h"
 #include "dl/autograd.h"
 #include "dl/amp.h"
+#include "ops/grouped_attention.h"
 
 #include <cmath>
 #include <stdexcept>
@@ -83,15 +84,7 @@ Tensor GroupedQueryAttention::run(const Tensor& input, KVCache* cache) {
     auto k = rotary_->forward(project(*key_, kv_heads_), offset);
     auto v = project(*value_, kv_heads_);
     if (cache) { cache->append(k, v); k = cache->key(); v = cache->value(); }
-    // 新块中的 query 采用绝对位置；逐 token 解码时全部历史 key 均可见。
-    std::optional<Tensor> mask;
-    if (length > 1) {
-        auto keys = arange(static_cast<double>(k.size(2)), {.dtype = DType::i64, .device = input.device()});
-        auto queries = arange(static_cast<double>(offset), static_cast<double>(offset + length), 1.0,
-            {.dtype = DType::i64, .device = input.device()});
-        mask = le(keys, queries.unsqueeze(1));
-    }
-    auto attended = grouped_query_attention(q, k, v, std::move(mask));
+    auto attended = detail::grouped_attention(q, k, v, std::nullopt, offset);
     return (*output_)(attended.transpose(1, 2).reshape({batch, length, dimensions_}));
 }
 
@@ -99,8 +92,8 @@ TransformerDecoderLayer::TransformerDecoderLayer(Index dimensions, Index heads, 
                                                  Index context, TensorOptions options) {
     attention_ = add_module<GroupedQueryAttention>("attention", dimensions, heads, kv_heads, context, options);
     feedforward_ = add_module<SwiGLU>("feedforward", dimensions, hidden, false, options);
-    attention_norm_ = add_module<RMSNorm>("attention_norm", Shape{dimensions}, 1e-5, true, options);
-    feedforward_norm_ = add_module<RMSNorm>("feedforward_norm", Shape{dimensions}, 1e-5, true, options);
+    attention_norm_ = add_module<RMSNorm>("attention_norm", Shape{dimensions}, norm_epsilon, true, options);
+    feedforward_norm_ = add_module<RMSNorm>("feedforward_norm", Shape{dimensions}, norm_epsilon, true, options);
 }
 Tensor TransformerDecoderLayer::forward(const Tensor& input) {
     auto residual = input + (*attention_)((*attention_norm_)(input));
@@ -118,7 +111,7 @@ TransformerDecoder::TransformerDecoder(Index layers, Index dimensions, Index hea
     for (Index i = 0; i < layers; ++i)
         layers_.push_back(add_module<TransformerDecoderLayer>("layer" + std::to_string(i), dimensions, heads,
             kv_heads, hidden, context, options));
-    normalization_ = add_module<RMSNorm>("normalization", Shape{dimensions}, 1e-5, true, options);
+    normalization_ = add_module<RMSNorm>("normalization", Shape{dimensions}, TransformerDecoderLayer::norm_epsilon, true, options);
 }
 Tensor TransformerDecoder::forward(const Tensor& input) {
     auto result = input;

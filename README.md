@@ -61,7 +61,7 @@ auto gradient = *x.grad();
 | [组合与执行](docs/execution.md) | 函数式状态、随机 key、执行计划与重算 |
 | [扩展](docs/extensions.md) | C17、自定义 VJP 与 DLPack |
 | [NPU 推理](docs/npu.md) | 可选 OpenVINO 请求与输出复用 |
-| [ONNX 导出](docs/onnx.md) | 固定推理图与部署端调用 |
+| [ONNX 导出](docs/onnx.md) | 固定形状推理图、动态长度解码器和 KV 缓存部署 |
 
 ## 独立验证
 

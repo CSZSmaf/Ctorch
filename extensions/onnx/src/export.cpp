@@ -1,16 +1,13 @@
 #include "dl/onnx.h"
-#include "protobuf.h"
+#include "model_writer.h"
 
-#include <fstream>
 #include <numeric>
 #include <stdexcept>
 #include <unordered_map>
-#include <unordered_set>
 
 namespace dl::onnx {
 namespace {
 
-using detail::Message;
 using plan::Attribute;
 using plan::NodeInfo;
 using plan::Value;
@@ -20,40 +17,10 @@ template <class T> T property(const NodeInfo& node, std::string_view name) {
     throw std::invalid_argument("missing operator attribute: " + std::string(name));
 }
 
-struct Exporter {
+struct Exporter : detail::ModelWriter {
+    explicit Exporter(plan::GraphInfo source) : info(std::move(source)) {}
     plan::GraphInfo info;
-    Message graph;
     std::vector<std::string> names;
-    std::unordered_set<std::string> used;
-    std::size_t temporary = 0;
-
-    std::string fresh() {
-        std::string name;
-        do { name = "value_" + std::to_string(temporary++); } while (!used.insert(name).second);
-        return name;
-    }
-    std::string constant(const Tensor& value) {
-        auto name = fresh();
-        graph.message(5, detail::tensor_data(name, value));
-        return name;
-    }
-    std::string indices(const Shape& values) {
-        return constant(from_span<Index>(values, {static_cast<Index>(values.size())}));
-    }
-    void emit(std::string_view operation, const std::vector<std::string>& inputs, const std::string& output,
-              std::span<const Attribute> attributes = {}) {
-        Message node;
-        for (const auto& input : inputs) node.data(1, input);
-        node.data(2, output); node.data(4, operation);
-        for (const auto& value : attributes) node.message(5, detail::attribute(value));
-        graph.message(1, node);
-    }
-    std::string intermediate(std::string_view operation, const std::vector<std::string>& inputs,
-                             std::vector<Attribute> attributes = {}) {
-        auto name = fresh();
-        emit(operation, inputs, name, attributes);
-        return name;
-    }
 
     void lower(const NodeInfo& node) {
         const auto& kind = node.operation.kind;
@@ -133,7 +100,7 @@ struct Exporter {
 
 void save(const std::filesystem::path& path, const plan::Graph& source,
           std::span<const Value> outputs, std::span<const Binding> weights) {
-    Exporter writer{source.describe(), {}, {}, {}, 0};
+    Exporter writer(source.describe());
     auto& info = writer.info;
     std::vector<bool> needed(info.values.size()), keep(info.nodes.size());
     for (auto value : outputs) needed[value.index] = true;
@@ -176,14 +143,7 @@ void save(const std::filesystem::path& path, const plan::Graph& source,
         writer.emit("Identity", {writer.names[outputs[i].index]}, name);
         writer.graph.message(12, detail::value_info(name, info.values[outputs[i].index]));
     }
-    Message model, opset;
-    model.integer(1, 8); model.data(2, "Ctorch"); model.message(7, writer.graph);
-    opset.integer(2, 18); model.message(8, opset);
-    std::ofstream file;
-    file.exceptions(std::ios::failbit | std::ios::badbit);
-    file.open(path, std::ios::binary | std::ios::trunc);
-    file.write(model.bytes.data(), static_cast<std::streamsize>(model.bytes.size()));
-    file.close();
+    writer.write(path, 8, 18);
 }
 
 } // namespace dl::onnx

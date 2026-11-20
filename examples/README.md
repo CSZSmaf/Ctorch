@@ -59,5 +59,6 @@ MNIST 目录包含标准解压文件名，像素缩放到 `[0,1]`。训练集前
 | [dlpack_vjp.cpp](dlpack_vjp.cpp) / [c_dlpack.c](c_dlpack.c) | DLPack 共享视图与外部计算 |
 | [segmentation.cpp](segmentation.cpp) / [variable_length.cpp](variable_length.cpp) | 二值分割与变长文本批次 |
 | [export_onnx.cpp](export_onnx.cpp) | 导出两层分类器或 MNIST MLP 的最佳权重，需启用 `CTORCH_USE_ONNX` |
+| [export_decoder_onnx.cpp](export_decoder_onnx.cpp) | 导出字节解码器及各层 KV 缓存接口，需启用 `CTORCH_USE_ONNX` |
 
 源码目标使用 `ctorch_` 前缀；`installed` 工程使用相同示例文件，只通过安装包链接。CUDA、cuDNN 和 DLPack 专用示例随对应构建选项启用。

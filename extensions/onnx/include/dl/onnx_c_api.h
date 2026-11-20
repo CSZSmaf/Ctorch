@@ -11,6 +11,9 @@ typedef struct dl_onnx_binding { dl_plan_value input; const dl_tensor* value; } 
 /* path 为 UTF-8 路径；weights 将相应图输入固定为常量，其余输入保留名称。 */
 DL_ONNX_API dl_status dl_onnx_save(const char* path, const dl_graph* graph,
     const dl_plan_value* outputs, size_t count, const dl_onnx_binding* weights, size_t weight_count);
+/* 同时传入词嵌入和输出层可导出语言模型。两者都传 NULL 时导出特征解码器。 */
+DL_ONNX_API dl_status dl_onnx_save_decoder(const char* path, const dl_module* decoder,
+    const dl_module* embedding, const dl_module* output);
 
 #ifdef __cplusplus
 }

@@ -145,8 +145,31 @@ template <bool Logarithmic> TensorData softmax_forward(const TensorData& input, 
     return result;
 }
 
+// 每行只归约可见的 key。矩阵乘输出的连续存储依次保存指数和最终概率。
+__global__ void attention_softmax_kernel(float* scores, Index rows, Index width, Index queries,
+                                         Index first, float scale) {
+    __shared__ float shared[block_size];
+    for (Index row = blockIdx.x; row < rows; row += gridDim.x) {
+        auto* values = scores + row * width;
+        const auto end = first < 0 ? width : min(width, first + row % queries + 1);
+        float maximum = -CUDART_INF_F;
+        for (Index i = threadIdx.x; i < end; i += blockDim.x)
+            maximum = reduce_pair<true>(maximum, values[i] * scale);
+        maximum = block_reduce<true>(maximum, shared);
+        float total = 0.0f;
+        for (Index i = threadIdx.x; i < end; i += blockDim.x) {
+            // 先舍入缩放后的分数，最大项减自身应恰好得到零。
+            values[i] = expf(__fmul_rn(values[i], scale) - maximum);
+            total += values[i];
+        }
+        total = block_reduce<false>(total, shared);
+        for (Index i = threadIdx.x; i < width; i += blockDim.x)
+            values[i] = i < end ? values[i] / total : 0.0f;
+    }
+}
+
 template <bool Logarithmic>
-TensorData softmax_gradient(const TensorData& grad, const TensorData& output, Index axis) {
+TensorData softmax_gradient(const TensorData& grad, const TensorData& output, Index axis, float scale = 1.0f) {
     auto result = empty_data(output.layout.sizes, output.dtype, output.device());
     if (output.layout.numel() == 0) return result;
     const auto width = output.layout.sizes[axis];
@@ -155,7 +178,7 @@ TensorData softmax_gradient(const TensorData& grad, const TensorData& output, In
     Execution execution(output);
     softmax_backward_kernel<Logarithmic><<<row_grid_size(rows), block_size, 0, execution.stream()>>>(
         grad.data<float>(), output.data<float>(), result.mutable_data<float>(), rows, width, inner,
-        IndexMap(grad.layout), IndexMap(output.layout));
+        IndexMap(grad.layout), IndexMap(output.layout), scale);
     check(cudaGetLastError());
     return result;
 }
@@ -167,6 +190,20 @@ TensorData softmax(const TensorData& input, Index axis, bool logarithmic) {
 }
 TensorData softmax_backward(const TensorData& grad, const TensorData& output, Index axis, bool logarithmic) {
     return logarithmic ? softmax_gradient<true>(grad, output, axis) : softmax_gradient<false>(grad, output, axis);
+}
+
+void attention_softmax_inplace(TensorData& scores, float scale, Index first) {
+    if (scores.layout.numel() == 0) return;
+    const auto& shape = scores.layout.sizes;
+    const auto width = shape[3], rows = scores.layout.numel() / width;
+    Execution execution(scores);
+    attention_softmax_kernel<<<row_grid_size(rows), block_size, 0, execution.stream()>>>(
+        scores.mutable_data<float>(), rows, width, shape[2], first, scale);
+    check(cudaGetLastError());
+}
+
+TensorData attention_softmax_backward(const TensorData& grad, const TensorData& weights, float scale) {
+    return softmax_gradient<false>(grad, weights, 3, scale);
 }
 
 } // namespace dl::detail::cuda

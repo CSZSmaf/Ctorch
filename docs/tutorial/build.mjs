@@ -61,7 +61,8 @@ const sections = {
     ["examples/decoder_generate.cpp", "缓存文本生成"],
     ["examples/segmentation.cpp", "二值图像分割"],
     ["examples/variable_length.cpp", "变长文本分类"],
-    ["examples/export_onnx.cpp", "导出 ONNX"],
+    ["examples/export_onnx.cpp", "导出 ONNX 分类器"],
+    ["examples/export_decoder_onnx.cpp", "导出 ONNX 解码器"],
     ["examples/comparison/README.md", "跨框架比较"],
   ] },
 };

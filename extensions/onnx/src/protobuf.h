@@ -35,13 +35,18 @@ inline Index type_code(DType dtype) {
     return codes[static_cast<std::size_t>(dtype)];
 }
 
-inline Message value_info(std::string_view name, const TensorSpec& spec) {
-    Message shape, tensor, type, result;
-    for (auto extent : spec.shape) { Message dimension; dimension.integer(1, extent); shape.message(1, dimension); }
-    tensor.integer(1, type_code(spec.dtype)); tensor.message(2, shape);
+inline Message value_info(std::string_view name, DType dtype, const Message& shape) {
+    Message tensor, type, result;
+    tensor.integer(1, type_code(dtype)); tensor.message(2, shape);
     type.message(1, tensor);
     result.data(1, name); result.message(2, type);
     return result;
+}
+
+inline Message value_info(std::string_view name, const TensorSpec& spec) {
+    Message shape;
+    for (auto extent : spec.shape) { Message dimension; dimension.integer(1, extent); shape.message(1, dimension); }
+    return value_info(name, spec.dtype, shape);
 }
 
 inline Message tensor_data(std::string_view name, const Tensor& tensor) {

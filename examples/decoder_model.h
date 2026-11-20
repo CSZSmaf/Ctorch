@@ -25,6 +25,9 @@ public:
         return (*output_)((*decoder_)((*tokens_)(input)));
     }
     std::vector<dl::nn::KVCache> make_cache() const { return decoder_->make_cache(); }
+    const dl::nn::Embedding& embedding() const { return *tokens_; }
+    const dl::nn::TransformerDecoder& decoder() const { return *decoder_; }
+    const dl::nn::Linear& output_layer() const { return *output_; }
     dl::Tensor decode(const dl::Tensor& input, std::span<dl::nn::KVCache> cache) {
         dl::NoGradGuard inference;
         return (*output_)(decoder_->decode((*tokens_)(input), cache));

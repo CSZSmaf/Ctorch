@@ -55,6 +55,31 @@ CPU 命令适合检查流程。使用 GPU 时，按[构建手册](../build.md)�
 
 字节模型直接输出字节。英文文本便于观察；多字节 UTF-8 文本可能在生成结束处截断一个字符。训练步数较少时输出通常仍有重复或无意义片段，需要结合验证损失判断学习情况。
 
+## 用 ONNX Runtime 续写
+
+启用 ONNX 扩展后，导出命令会读取训练保存的词嵌入、全部解码层和词表投影。
+
+```sh
+cmake -S . -B ../Ctorch-work/build -DCTORCH_USE_ONNX=ON
+cmake --build ../Ctorch-work/build --target ctorch_export_decoder_onnx
+../Ctorch-work/build/bin/ctorch_export_decoder_onnx ../Ctorch-work/runs/decoder/best.ct ../Ctorch-work/decoder.onnx
+```
+
+用空缓存输入提示文本。根据最后一个位置的 logits 选取新字节，再将新字节和返回的各层缓存一起送入模型。本例的前缀和续写合计最多 128 个字节。[ONNX Runtime 示例](../onnx.md#导出带-kv-缓存的解码器)
+
+## 长序列训练
+
+基线一次计算全部查询位置，并把完整的注意力概率留给反向传播。当前实现根据分数矩阵大小选择分块。下表使用同一台 NVIDIA RTX 5090 Laptop GPU 和相同的初始权重及输入。模型有两层解码器，宽度 64，含 4 个查询头和 2 个 KV 头，批量为 2。每个训练步包括词嵌入、全部解码层、词表投影、交叉熵、反向传播和 AdamW 更新。
+
+| 序列长度 | 精度 | 基线每步 | 当前实现每步 | 基线显存峰值 | 当前实现显存峰值 |
+| ---: | --- | ---: | ---: | ---: | ---: |
+| 1024 | FP32 | 3.59 ms | 2.97 ms | 148.1 MiB | 146.1 MiB |
+| 1024 | BF16 混合精度 | 3.85 ms | 3.01 ms | 162.6 MiB | 160.6 MiB |
+| 2048 | FP32 | 9.70 ms | 6.77 ms | 554.3 MiB | 133.5 MiB |
+| 2048 | BF16 混合精度 | 9.34 ms | 5.68 ms | 615.2 MiB | 132.3 MiB |
+
+1024 token 时，分数矩阵可以一次处理。2048 token 时，每块处理 512 个查询位置。每种配置预热 12 步后连续训练 32 步，耗时取 5 轮交错测量的中位数。显存峰值统计训练期间 Ctorch CUDA 内存池正在使用的字节数。
+
 ## 缓存计算耗时
 
 以下测量使用 NVIDIA RTX 5090 Laptop GPU、CUDA 13.2、cuDNN 9.21 和 Release 构建。两种路径使用相同的两层解码器、模型宽度 64、4 个 query 头、2 个 K/V 头及中间宽度 256，batch 为 1。

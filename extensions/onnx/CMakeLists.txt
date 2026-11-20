@@ -1,4 +1,4 @@
-add_library(ctorch_onnx src/export.cpp src/c_api.cpp)
+add_library(ctorch_onnx src/export.cpp src/decoder.cpp src/c_api.cpp)
 add_library(ctorch::onnx ALIAS ctorch_onnx)
 target_compile_features(ctorch_onnx PUBLIC cxx_std_20)
 target_link_libraries(ctorch_onnx PUBLIC ctorch::ctorch)

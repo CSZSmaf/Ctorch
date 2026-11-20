@@ -85,7 +85,7 @@ __global__ void softmax_kernel(const T* input, float* output, Index rows, Index 
 /// softmax 用 sum(g*y)，log_softmax 用 sum(g)，行统计和 VJP 共用一次启动。
 template <bool Logarithmic>
 __global__ void softmax_backward_kernel(const float* grad, const float* saved, float* output,
-    Index rows, Index width, Index inner, IndexMap grad_layout, IndexMap saved_layout) {
+    Index rows, Index width, Index inner, IndexMap grad_layout, IndexMap saved_layout, float scale) {
     __shared__ float shared[block_size];
     for (Index row = blockIdx.x; row < rows; row += gridDim.x) {
         const auto base = (row / inner) * width * inner + row % inner;
@@ -102,7 +102,7 @@ __global__ void softmax_backward_kernel(const float* grad, const float* saved, f
             const float value = grad[grad_layout.offset(index)];
             const float probability = saved[saved_layout.offset(index)];
             if constexpr (Logarithmic) output[index] = value - expf(probability) * total;
-            else output[index] = probability * (value - total);
+            else output[index] = (probability * (value - total)) * scale;
         }
     }
 }

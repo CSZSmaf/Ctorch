@@ -19,7 +19,7 @@ Ctorch 的张量运算、模块和训练循环使用 C++ 接口。迁移模型�
 | `pad_sequence` | `dl::data::pad_sequence` 返回数据、长度和有效位置 mask |
 | `CrossEntropyLoss(weight, label_smoothing)` | `dl::CrossEntropyOptions` 使用相同的加权平均约定 |
 | `ReduceLROnPlateau` | `dl::training::ReduceLROnPlateau` 在验证后接收指标 |
-| ONNX 导出 | 独立 `ctorch::onnx` 模块导出显式固定形状推理图 |
+| ONNX 导出 | `ctorch::onnx` 导出固定形状的显式图，也可从 `TransformerDecoder` 直接导出带 KV 缓存的动态长度模型 |
 
 保存的张量在反向前保持原值。设备迁移、状态加载和参数更新安排在前向图之间。先迁移模型，再用迁移后的参数构造优化器。
 

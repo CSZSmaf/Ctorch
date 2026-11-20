@@ -1,6 +1,6 @@
 # 导出 ONNX 推理模型
 
-ONNX 文件包含计算图、输入输出形状和固定权重。导出的模型可交给 ONNX Runtime，或由 [OpenVINO 扩展](npu.md)读取。导出模块是独立的 CMake 目标，使用时不需要安装 Python、Protobuf 或 ONNX Runtime。
+ONNX 文件保存推理所需的计算图和权重。分类器和卷积网络可以用 `Graph` 描述后导出。Ctorch 的 `TransformerDecoder` 可以直接从模型导出，支持不同长度的输入和 KV 缓存。导出器是独立的 CMake 目标，只依赖 Ctorch。运行文件时，推理引擎需要支持模型使用的 ONNX 算子。
 
 ## 构建
 
@@ -17,7 +17,7 @@ find_package(Ctorch CONFIG REQUIRED COMPONENTS onnx)
 target_link_libraries(model PRIVATE ctorch::onnx)
 ```
 
-C17 入口位于 `<dl/onnx_c_api.h>`，`dl_onnx_save()` 接收 C 图对象、输出列表和权重绑定。
+C17 入口位于 `<dl/onnx_c_api.h>`。`dl_onnx_save` 接收图、输出列表和权重绑定。`dl_onnx_save_decoder` 接收解码器及可选的词嵌入和输出层。
 
 ## 构图和权重绑定
 
@@ -65,7 +65,54 @@ print(scores.argmax(axis=1).item())
 
 输出的十列依次对应数字 0 到 9。分数最大的列给出预测类别。部署时只需复制 `mnist.onnx`，模型权重已经包含在文件中。
 
-## 支持范围
+## 导出带 KV 缓存的解码器
+
+本节示例使用 [Ctorch 主分支源码](https://github.com/CSZSmaf/Ctorch/tree/main)。把训练时使用的词嵌入、解码器和输出层交给 `save_decoder`。导出器读取模型的层数、头数、旋转位置表和权重。输入是 `int64` 的 `input_ids[batch,tokens]`，输出是 `logits[batch,tokens,输出维度]`。词嵌入和输出层可以共享权重，也可以各自训练。
+
+```cpp
+dl::onnx::save_decoder("language_model.onnx", embedding, decoder, output_layer);
+```
+
+只需要解码器特征时，调用 `dl::onnx::save_decoder("decoder.onnx", decoder)`。这个模型接收 `features[batch,tokens,width]` 并返回同形状的 `hidden_states`，两者都是 FP32。两个接口都导出 FP32 权重和 ONNX opset 24 的标准算子。[ONNX Attention](https://onnx.ai/onnx/operators/onnx__Attention.html)
+
+例如，[字节解码器项目](projects/decoder.md)训练后，用下面的命令导出可以直接续写的语言模型。
+
+```sh
+../Ctorch-build/onnx/bin/ctorch_export_decoder_onnx ../Ctorch-work/runs/decoder/best.ct ../decoder.onnx
+```
+
+每层有两份缓存。第 `i` 层接收 `past_key_i` 和 `past_value_i`，返回 `present_key_i` 和 `present_value_i`。形状依次为 `[batch,kv_heads,历史长度,head_dim]` 和 `[batch,kv_heads,历史长度+本次输入长度,head_dim]`。首次输入时把历史长度设为零。续写时把上次返回的缓存交给同一层。累计长度可以达到模型的 RoPE 表容量。
+
+下面用 ONNX Runtime 运行字节模型。第一次送入完整提示文本，第二次只送入新选出的字节。
+
+```python
+import numpy as np
+import onnxruntime as ort
+
+session = ort.InferenceSession("../decoder.onnx", providers=["CPUExecutionProvider"])
+prefix = np.array([list(b"ROMEO: ")], dtype=np.int64)
+cache = {
+    port.name: np.empty((len(prefix), port.shape[1], 0, port.shape[3]), dtype=np.float32)
+    for port in session.get_inputs() if port.name.startswith("past_")
+}
+
+def decode(ids, cache):
+    values = session.run(None, {"input_ids": ids, **cache})
+    outputs = dict(zip((port.name for port in session.get_outputs()), values))
+    cache = {
+        name.replace("present_", "past_", 1): value
+        for name, value in outputs.items() if name.startswith("present_")
+    }
+    return outputs["logits"], cache
+
+logits, cache = decode(prefix, cache)
+next_id = logits[:, -1].argmax(axis=-1, keepdims=True).astype(np.int64)
+logits, cache = decode(next_id, cache)
+```
+
+批量和每次输入的 token 数由调用方决定。同一批序列共用一个历史长度。分词和选取下一个 token 由应用完成。[导出示例源码](../examples/export_decoder_onnx.cpp)
+
+## 固定形状图支持的算子
 
 导出格式为 ONNX opset 18、IR 8。输入形状固定，支持 FP32 和 FP64 图。权重的形状和类型与对应图输入一致；CPU 和 CUDA 权重均可导出，CUDA 权重在导出时复制到 CPU。
 

@@ -11,8 +11,10 @@ ctorch_add_example(ctorch_project_compare comparison/project_compare.cpp)
 ctorch_add_example(ctorch_compare_training comparison/train_mlp.cpp)
 
 if(CTORCH_USE_ONNX)
-    ctorch_add_example(ctorch_export_onnx export_onnx.cpp)
-    target_link_libraries(ctorch_export_onnx PRIVATE ctorch::onnx)
+    foreach(example IN ITEMS export_onnx export_decoder_onnx)
+        ctorch_add_example(ctorch_${example} ${example}.cpp)
+        target_link_libraries(ctorch_${example} PRIVATE ctorch::onnx)
+    endforeach()
 endif()
 
 if(CTORCH_USE_CUDA)

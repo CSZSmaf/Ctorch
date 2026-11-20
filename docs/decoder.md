@@ -48,7 +48,9 @@ auto output = dl::grouped_query_attention(query, key, value); // [2,8,3,24]
 
 Q、K、V 都使用 `[batch,heads,length,features]`。query 头数是 K/V 头数的正整数倍，K 与 V 的头数及长度一致。上例中每四个相邻 query 头共享一个 K/V 头。
 
-可选 `keep_mask` 是布尔张量，形状可广播到 `[batch,query_heads,query_length,key_length]`。`true` 表示可读取的位置，每个查询至少保留一个位置。`GroupedQueryAttention` 模块和解码器会按位置构造因果掩码。同组查询头的行共用一块 key 矩阵和一块 value 矩阵，CPU 和 CUDA 都通过批量矩阵乘完成计算。
+可选 `keep_mask` 是布尔张量，形状可广播到 `[batch,query_heads,query_length,key_length]`。`true` 表示可读取的位置，每个查询至少保留一个位置。`GroupedQueryAttention` 模块和解码器按序列位置应用因果掩码。同组查询头共用 K 和 V，通过批量矩阵乘完成计算。
+
+长序列训练时，数学后端按查询位置分块。每块只计算所需的 key 前缀，反向传播时重算该块的注意力概率。这样可以释放前向分数矩阵，避免各层同时保存完整的概率矩阵。CUDA 把缩放、因果掩码和 softmax 合并在一次内核调用中。输入形状和训练接口保持一致。[训练耗时与显存](projects/decoder.md#长序列训练)
 
 ## 训练解码器
 
@@ -67,7 +69,7 @@ auto features = decoder(input); // [2,32,64]
 
 每层依次执行 RMSNorm、带 RoPE 的因果注意力、残差相加、RMSNorm、SwiGLU 和残差相加。层堆叠后再做一次 RMSNorm，epsilon 为 `1e-5`。当前层没有 dropout。
 
-输入是特征向量。语言模型在前面接 Embedding，在后面接词表 Linear，训练时对全部有效位置计算交叉熵。完整项目见[字节解码器](projects/decoder.md)。
+输入是特征向量。语言模型在前面接 Embedding，在后面接词表 Linear，训练时对全部有效位置计算交叉熵。训练后可以导出整个语言模型，也可以单独导出特征解码器。[字节解码器项目](projects/decoder.md) · [导出带 KV 缓存的解码器](onnx.md#导出带-kv-缓存的解码器)
 
 ## KV 缓存
 

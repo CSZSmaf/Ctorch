@@ -5,6 +5,8 @@
 
 #include <filesystem>
 
+namespace dl::nn { class Embedding; class TransformerDecoder; class Linear; }
+
 namespace dl::onnx {
 
 struct Binding { plan::Value input; Tensor value; };
@@ -19,5 +21,13 @@ inline void save(const std::filesystem::path& path, const plan::Graph& graph,
     std::initializer_list<plan::Value> outputs, std::initializer_list<Binding> weights = {}) {
     save(path, graph, std::span(outputs.begin(), outputs.size()), std::span(weights.begin(), weights.size()));
 }
+
+/// 导出 FP32 解码器推理图。输入特征为 [batch,tokens,width]，输出同形。
+/// 每层接收 past_key_i、past_value_i 并返回 present_key_i、present_value_i。
+/// 首次调用传入长度为零的缓存。批量、新块长度和历史长度均在运行时确定。
+DL_ONNX_API void save_decoder(const std::filesystem::path& path, const nn::TransformerDecoder& decoder);
+/// 带词嵌入和输出投影的模型直接接收 int64 input_ids，并输出词表 logits。
+DL_ONNX_API void save_decoder(const std::filesystem::path& path, const nn::Embedding& embedding,
+                              const nn::TransformerDecoder& decoder, const nn::Linear& output);
 
 } // namespace dl::onnx

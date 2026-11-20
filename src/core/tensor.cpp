@@ -30,15 +30,13 @@ void Tensor::requires_grad_(bool enabled) const {
 Tensor Tensor::detach() const { return detail::make_tensor(impl_->data); }
 
 void Tensor::backward() const {
-    if (numel() != 1) throw std::invalid_argument("backward needs an explicit seed for a non-scalar result");
-    backward(ones(shape(), {.dtype = accumulation_dtype(dtype()), .device = device()}));
+    if (!impl_->autograd) throw std::logic_error("backward requires a tensor that tracks gradients");
+    detail::run_backward(impl_->autograd->edge, detail::backward_seed(*this));
 }
 
 void Tensor::backward(const Tensor& seed) const {
     if (!impl_->autograd) throw std::logic_error("backward requires a tensor that tracks gradients");
-    if (seed.shape() != shape() || seed.device() != device())
-        throw std::invalid_argument("backward seed must match the result shape and device");
-    detail::run_backward(impl_->autograd->edge, detail::data_of(seed));
+    detail::run_backward(impl_->autograd->edge, detail::backward_seed(*this, &seed));
 }
 
 std::optional<Tensor> Tensor::grad() const {
@@ -62,6 +60,19 @@ Tensor zeros(Shape shape, TensorOptions options) { return full(std::move(shape),
 Tensor ones(Shape shape, TensorOptions options) { return full(std::move(shape), 1.0, options); }
 
 namespace detail {
+
+TensorData backward_seed(const Tensor& output, const Tensor* seed) {
+    const auto dtype = accumulation_dtype(output.dtype());
+    if (!seed) {
+        if (output.numel() != 1) throw std::invalid_argument("non-scalar output requires an explicit gradient seed");
+        return numeric::full(output.shape(), 1.0, dtype, output.device());
+    }
+    if (seed->shape() != output.shape() || seed->device() != output.device())
+        throw std::invalid_argument("gradient seed must match the output shape and device");
+    if (seed->dtype() != output.dtype() && seed->dtype() != dtype)
+        throw std::invalid_argument("gradient seed must use the output or accumulation dtype");
+    return numeric::cast(data_of(*seed), dtype);
+}
 
 Tensor from_host(const void* source, Shape shape, DType dtype, bool requires_grad, Device device) {
     auto data = empty_data(std::move(shape), dtype);

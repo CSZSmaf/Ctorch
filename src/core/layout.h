@@ -27,6 +27,8 @@ inline Shape contiguous_strides(std::span<const Index> shape) {
 
 Shape resolve_shape(Shape shape, Index count);
 Shape broadcast_shape(std::span<const Index> a, std::span<const Index> b);
+Shape matmul_shape(std::span<const Index> left, std::span<const Index> right);
+Shape linear_shape(const Shape& input, const Shape& weight, const Shape* bias);
 Shape all_axes(Index rank);
 Shape normalize_axes(Shape axes, Index rank);
 

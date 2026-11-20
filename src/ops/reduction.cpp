@@ -131,6 +131,8 @@ Tensor amax(const Tensor& input, Shape axes, KeepDim keep) {
 namespace {
 
 Tensor normalized_exponential(const Tensor& input, Index axis, bool logarithmic) {
+    if (input.ndim() == 0 && (axis == 0 || axis == -1))
+        return normalized_exponential(input.reshape({1}), 0, logarithmic).reshape({});
     axis = detail::axis_index(axis, input.ndim());
     auto result = detail::numeric::softmax(detail::data_of(input), axis, logarithmic);
     auto saved = result;

@@ -133,12 +133,19 @@ std::vector<KVCache> TransformerDecoder::make_cache() const {
 }
 Tensor TransformerDecoder::decode(const Tensor& input, std::span<KVCache> cache) {
     if (cache.size() != layers_.size()) throw std::invalid_argument("decoder requires one cache per layer");
-    if (!cache.empty()) for (const auto& layer : cache)
-        if (layer.length() != cache[0].length()) throw std::invalid_argument("decoder cache positions differ");
+    const auto prefix = cache.front().length();
+    for (const auto& layer : cache)
+        if (layer.length() != prefix) throw std::invalid_argument("decoder cache positions differ");
     NoGradGuard guard;
-    auto result = input;
-    for (std::size_t i = 0; i < layers_.size(); ++i) result = layers_[i]->decode(result, cache[i]);
-    return (*normalization_)(result);
+    try {
+        auto result = input;
+        for (std::size_t i = 0; i < layers_.size(); ++i) result = layers_[i]->decode(result, cache[i]);
+        return (*normalization_)(result);
+    } catch (...) {
+        // 各层共同提交一个 token 块，调用方可从原前缀重试。
+        for (auto& layer : cache) layer.truncate(prefix);
+        throw;
+    }
 }
 
 } // namespace dl::nn

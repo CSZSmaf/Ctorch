@@ -92,7 +92,7 @@ auto saved = dl::io::load_checkpoint("latest.train.ct");
 progress = dl::io::restore_checkpoint(saved, model, optimizer, loader, generators);
 ```
 
-采集检查点时，预取器先完成正在进行的整理，再保存待交付批次、读取位置和随机状态。恢复后先使用这些批次，因此已经执行的数据增强不会重做。下一次 `next()` 自动继续后台整理。
+采集检查点时，预取器先完成正在进行的整理，再保存待交付批次、读取位置和随机状态。有待交付批次时，使用 `PrefetchLoader` 恢复。它先交付已保存的批次，再从采样游标继续读取。普通 `DataLoader` 的断点也可以交给预取器，恢复后沿用该预取器的深度和后台线程设置。
 
 训练检查点使用格式 7，读取器兼容格式 1–7。附加批次张量和后台整理配置随检查点保存。
 

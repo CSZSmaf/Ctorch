@@ -154,6 +154,7 @@ namespace {
 
 template <bool Logarithmic> TensorData softmax_forward(const TensorData& input, Index axis) {
     auto result = empty_data(input.layout.sizes, accumulation_dtype(input.dtype));
+    if (input.layout.numel() == 0) return result;
     const auto width = input.layout.sizes[axis];
     const auto inner = numel(std::span(input.layout.sizes).subspan(static_cast<std::size_t>(axis + 1)));
     const auto rows = input.layout.numel() / width;
@@ -204,6 +205,7 @@ template <bool Logarithmic> TensorData softmax_forward(const TensorData& input, 
 template <bool Logarithmic>
 TensorData softmax_gradient(const TensorData& grad, const TensorData& output, Index axis) {
     auto result = empty_data(output.layout.sizes, output.dtype);
+    if (output.layout.numel() == 0) return result;
     const auto width = output.layout.sizes[axis];
     const auto inner = numel(std::span(output.layout.sizes).subspan(static_cast<std::size_t>(axis + 1)));
     const auto rows = output.layout.numel() / width;

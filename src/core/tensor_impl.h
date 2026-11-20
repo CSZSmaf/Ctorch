@@ -30,5 +30,6 @@ inline Tensor make_tensor(TensorData data, bool requires_grad = false) {
 }
 
 inline const TensorData& data_of(const Tensor& tensor) { return TensorAccess::data(tensor); }
+TensorData backward_seed(const Tensor& output, const Tensor* seed = nullptr);
 
 } // namespace dl::detail

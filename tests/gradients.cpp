@@ -18,6 +18,12 @@ int main() {
         try { consumed.backward(); } catch (const std::logic_error&) { rejected = true; }
         test::expect(rejected, "a consumed graph requires a new forward");
         test::gradient(scalar, {4});
+        auto singleton = dl::grad(scalar, {scalar})[0].value();
+        test::expect(singleton.shape() == scalar.shape(), "implicit VJP seed preserves singleton axes");
+        auto empty = dl::ones({2, 0}, {.requires_grad = true});
+        auto probabilities = dl::softmax(empty, -1);
+        auto gradient = dl::grad(probabilities, {empty}, probabilities.detach())[0].value();
+        test::expect(gradient.shape() == empty.shape(), "empty softmax preserves gradient shape");
         directional_check({-.7, .2, 1.2, -1.1, .5, .9}, {2, 3}, [](const auto& x) {
             return dl::sum(dl::pad(x.transpose(0, 1), {1, 2, 2, 0}, .5) * .7);
         });

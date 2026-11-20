@@ -186,10 +186,7 @@ TensorData argsort(const TensorData& input, Index axis, bool descending) {
     return backend(input.device()).argsort(input, axis, descending);
 }
 Shape matmul_shape(const TensorData& a, const TensorData& b) {
-    const auto left = std::span<const Index>(a.layout.sizes), right = std::span<const Index>(b.layout.sizes);
-    auto shape = broadcast_shape(left.first(left.size() - 2), right.first(right.size() - 2));
-    shape.insert(shape.end(), {left[left.size() - 2], right.back()});
-    return shape;
+    return detail::matmul_shape(a.layout.sizes, b.layout.sizes);
 }
 TensorData matmul(const TensorData& a, const TensorData& b) {
     auto result = empty_data(matmul_shape(a, b), accumulation_dtype(a.dtype), a.device());

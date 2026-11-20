@@ -97,7 +97,7 @@ public:
     /// repeats 非负且长度不少于 rank；新增前导轴按长度一理解，结果拥有独立数据。
     Tensor repeat(Shape repeats) const;
 
-    /// 标量反向使用种子 1；显式 seed 与输出的 shape 和 dtype 相同。
+    /// 单元素输出默认使用种子 1。显式 seed 与输出同形、同设备，使用输出类型或其累积类型。
     /// 一次反向消费该前向图，叶梯度在不同前向图之间累计。
     void backward() const;
     void backward(const Tensor& seed) const;

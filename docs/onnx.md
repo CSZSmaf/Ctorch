@@ -38,7 +38,32 @@ dl::onnx::save("model.onnx", graph, {y}, {
 
 这个文件保留名为 `input` 的 `[2,4]` 输入，输出名为 `output_0`，形状为 `[2,3]`。权重作为常量写入文件。多个输出依次使用 `output_1`、`output_2` 等名称，这些名称由导出器保留。
 
-完整两层分类器见 [export_onnx.cpp](../examples/export_onnx.cpp)。训练完成后，可以使用已加载检查点的参数构建同样的图。
+完整两层分类器见 [export_onnx.cpp](../examples/export_onnx.cpp)。
+
+## 部署训练好的 MNIST 分类器
+
+[MNIST 项目](projects/mnist.md)训练 MLP 后会保存 `best.ct`。把这份权重作为第二个参数交给导出程序。最后一个参数指定每次推理的图像数，默认是 1。
+
+```sh
+../Ctorch-build/onnx/bin/ctorch_export_onnx ../mnist.onnx ../Ctorch-work/runs/mnist-mlp/best.ct 1
+```
+
+下面用 ONNX Runtime 识别测试集的第一张图像。MNIST 图像文件的前 16 字节是文件头。图像按行存储，读取后除以 255，得到与训练相同的输入。
+
+```python
+from pathlib import Path
+import numpy as np
+import onnxruntime as ort
+
+images = Path("../Ctorch-work/data/mnist/t10k-images-idx3-ubyte")
+pixels = np.fromfile(images, dtype=np.uint8, count=28 * 28, offset=16)
+image = pixels.reshape(1, 1, 28, 28).astype(np.float32) / 255
+session = ort.InferenceSession("../mnist.onnx", providers=["CPUExecutionProvider"])
+scores = session.run(["output_0"], {"input": image})[0]
+print(scores.argmax(axis=1).item())
+```
+
+输出的十列依次对应数字 0 到 9。分数最大的列给出预测类别。部署时只需复制 `mnist.onnx`，模型权重已经包含在文件中。
 
 ## 支持范围
 

@@ -89,6 +89,8 @@ public:
     /// 随后读取 source 的 LoaderState 与增强 Generator 状态，可得到一致的检查点。
     PrefetchState state_dict() const;
     void load_state_dict(const PrefetchState& state);
+    /// 一起恢复采样游标和待交付批次。来自普通加载器的断点沿用当前预取设置。
+    void load_state_dict(const LoaderState& source, const std::optional<PrefetchState>& prefetch);
 
 private:
     struct Impl;

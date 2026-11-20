@@ -48,7 +48,7 @@ auto output = dl::grouped_query_attention(query, key, value); // [2,8,3,24]
 
 Q、K、V 都使用 `[batch,heads,length,features]`。query 头数是 K/V 头数的正整数倍，K 与 V 的头数及长度一致。上例中每四个相邻 query 头共享一个 K/V 头。
 
-可选 `keep_mask` 是布尔张量，`true` 表示可读取的位置，形状可广播到 `[batch,query_heads,query_length,key_length]`。函数默认没有因果限制；`GroupedQueryAttention` 模块和解码器负责按位置构造因果掩码。当前实现由批量矩阵乘、softmax 与广播组成，使用 CPU 或 CUDA 后端，不选择 cuDNN 融合注意力。
+可选 `keep_mask` 是布尔张量，形状可广播到 `[batch,query_heads,query_length,key_length]`。`true` 表示可读取的位置，每个查询至少保留一个位置。`GroupedQueryAttention` 模块和解码器会按位置构造因果掩码。同组查询头的行共用一块 key 矩阵和一块 value 矩阵，CPU 和 CUDA 都通过批量矩阵乘完成计算。
 
 ## 训练解码器
 
@@ -83,7 +83,7 @@ auto next = decoder.decode(dl::randn({1, 1, 64}), cache);
 
 缓存第一次使用时分配固定容量的 K/V 存储，之后把新位置写入空余部分。读取返回有效前缀的视图，避免反复拼接整个缓存。各层分别保存 K/V，RoPE 的起始位置取自已有长度。
 
-一次调用也可以追加多个 token。新块中每个位置只能读取自己和此前的 key；单 token 调用可以读取全部已有 key。`decode` 内部关闭梯度记录。
+一次调用可以追加多个 token。新块中每个位置可以读取自己和此前的 key。单 token 调用可以读取全部已有 key。`decode` 内部关闭梯度记录。如果某层无法追加整个块，各层都保留调用前的前缀，可以用较短的输入重试。
 
 一个请求持有一组缓存，并按顺序使用。`clear()` 清空长度并复用存储，`truncate(n)` 保留前 `n` 个位置。缓存视图共享存储，后续追加可能改写截断部分。更换模型权重、batch 大小、设备或 dtype 后，为请求重新调用 `make_cache()`。缓存不写入模型的 `state_dict()`。
 

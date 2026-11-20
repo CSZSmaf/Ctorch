@@ -1,8 +1,8 @@
 #include "dl/autograd.h"
 
 #include "core/tensor_impl.h"
-#include "ops/numeric.h"
 
+#include <stdexcept>
 #include <unordered_map>
 
 namespace dl {
@@ -17,17 +17,18 @@ detail::Edge existing_edge(const Tensor& tensor) {
 
 Gradients grad(std::span<const Tensor> outputs, std::span<const Tensor> inputs,
                std::span<const Tensor> seeds) {
+    if (!seeds.empty() && seeds.size() != outputs.size())
+        throw std::invalid_argument("grad expects one seed per output");
     std::vector<detail::Edge> roots, requests;
     std::vector<detail::TensorData> cotangents;
     roots.reserve(outputs.size());
     cotangents.reserve(outputs.size());
     requests.reserve(inputs.size());
     for (std::size_t i = 0; i < outputs.size(); ++i) {
+        auto seed = detail::backward_seed(outputs[i], seeds.empty() ? nullptr : &seeds[i]);
         if (auto edge = existing_edge(outputs[i]); edge.node) {
             roots.push_back(std::move(edge));
-            cotangents.push_back(seeds.empty()
-                ? detail::numeric::full({}, 1.0, accumulation_dtype(outputs[i].dtype()), outputs[i].device())
-                : detail::data_of(seeds[i]));
+            cotangents.push_back(std::move(seed));
         }
     }
     // 记录模式只决定前向是否建图；已有图在 NoGrad 作用域内也可求取梯度。

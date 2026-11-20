@@ -21,6 +21,8 @@ auto prediction = request.output();
 
 `image` 使用模型规定的 shape、dtype 和预处理。请求独占其输入输出缓冲，并保留编译模型的生命周期。连续推理复用同一个请求；多个请求可独立执行。
 
+[MNIST 导出示例](onnx.md#部署训练好的-mnist-分类器)生成的 `mnist.onnx` 可以直接传给 `CompiledModel`。批量为 1 时，输入是 `[1,1,28,28]` 的 FP32 图像，像素范围是 0 到 1。对返回的十个类别分数调用 `dl::argmax(prediction, 1)`，即可得到预测的数字。
+
 ## 数据与异步执行
 
 `set_input` 按逻辑顺序复制到请求缓冲，CUDA 输入先传回 CPU。调用结束后，原输入可释放或更新。`output()` 返回独立 CPU 张量；`output_into()` 复制到应用准备的连续、可写 CPU 张量，复用接收缓冲。

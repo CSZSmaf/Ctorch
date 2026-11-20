@@ -187,4 +187,10 @@ void PrefetchLoader::load_state_dict(const PrefetchState& state) {
     for (const auto& batch : state.pending) impl_->enqueue(batch);
 }
 
+void PrefetchLoader::load_state_dict(const LoaderState& source, const std::optional<PrefetchState>& prefetch) {
+    if (prefetch) load_state_dict(*prefetch);
+    else impl_->clear();
+    impl_->loader.load_state_dict(source);
+}
+
 } // namespace dl::data

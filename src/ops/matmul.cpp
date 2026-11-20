@@ -4,6 +4,8 @@
 #include "dl/amp.h"
 #include "ops/numeric.h"
 
+#include <stdexcept>
+
 namespace dl {
 namespace {
 
@@ -31,15 +33,15 @@ void matmul_gradient(const detail::Edge& edge, const detail::TensorData& left,
 } // namespace
 
 Tensor linear(const Tensor& input, const Tensor& weight, std::optional<Tensor> bias) {
+    if (input.device() != weight.device() || (bias && input.device() != bias->device()))
+        throw std::invalid_argument("linear inputs must share a device");
+    auto output_shape = detail::linear_shape(input.shape(), weight.shape(), bias ? &bias->shape() : nullptr);
     const auto compute_dtype = matrix_compute_dtype(input);
     const auto shape = std::span<const Index>(input.shape());
     const auto rows = detail::numel(shape.first(shape.size() - 1));
-    const auto columns = weight.size(0);
     // 所有前导维组成同一个行轴，连续输入共享存储，一般布局按 reshape 规则准备。
     auto [matrix, weights] = numeric::cast_pair(detail::data_of(input), detail::data_of(weight), compute_dtype);
     matrix = numeric::reshape(matrix, {rows, shape.back()});
-    auto output_shape = input.shape();
-    output_shape.back() = columns;
     auto result = numeric::linear(matrix, weights,
         bias ? std::optional{detail::data_of(*bias)} : std::nullopt, std::move(output_shape));
     std::vector edges{detail::gradient_edge(input), detail::gradient_edge(weight),
@@ -49,7 +51,7 @@ Tensor linear(const Tensor& input, const Tensor& weight, std::optional<Tensor> b
     return detail::record(std::move(result), std::move(edges),
         [saved_input = std::move(saved_input), saved_weight = std::move(saved_weight),
          input_shape = input.shape(), weight_shape = weight.shape(), bias_shape = bias ? bias->shape() : Shape{},
-         rows, columns, compute_dtype](const auto& grad, auto& sink, const auto& inputs) {
+         rows, columns = weight.size(0), compute_dtype](const auto& grad, auto& sink, const auto& inputs) {
             const bool input_gradient = sink.needs(inputs[0]), weight_gradient = sink.needs(inputs[1]);
             if (input_gradient || weight_gradient) {
                 const auto seed = numeric::reshape(numeric::cast(grad, compute_dtype), {rows, columns});
@@ -65,6 +67,7 @@ Tensor linear(const Tensor& input, const Tensor& weight, std::optional<Tensor> b
 }
 
 Tensor matmul(const Tensor& a, const Tensor& b) {
+    if (a.device() != b.device()) throw std::invalid_argument("matmul inputs must share a device");
     const bool left_vector = a.ndim() == 1;
     const bool right_vector = b.ndim() == 1;
     if (left_vector || right_vector) {

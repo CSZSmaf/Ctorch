@@ -3,11 +3,15 @@
 #include "autograd/record.h"
 #include "ops/numeric.h"
 
+#include <algorithm>
+#include <stdexcept>
+
 namespace dl {
 
 std::vector<Tensor> Tensor::split(Index split_size, Index axis) const {
+    if (split_size <= 0) throw std::invalid_argument("split size must be positive");
     const auto length = size(axis);
-    const auto count = length == 0 ? 1 : (length + split_size - 1) / split_size;
+    const auto count = length == 0 ? 1 : 1 + (length - 1) / split_size;
     Shape sizes(static_cast<std::size_t>(count), split_size);
     sizes.back() = length - (count - 1) * split_size;
     return split(std::move(sizes), axis);
@@ -21,13 +25,15 @@ std::vector<Tensor> Tensor::split(Shape sizes, Index axis) const {
         result.push_back(narrow(axis, start, length));
         start += length;
     }
+    if (start != size(axis)) throw std::invalid_argument("split sizes must cover the dimension");
     return result;
 }
 
 std::vector<Tensor> Tensor::chunk(Index chunks, Index axis) const {
+    if (chunks <= 0) throw std::invalid_argument("chunk count must be positive");
     const auto length = size(axis);
     return length == 0 ? split(Shape(static_cast<std::size_t>(chunks), 0), axis)
-                       : split((length + chunks - 1) / chunks, axis);
+                       : split(1 + (length - 1) / chunks, axis);
 }
 
 std::vector<Tensor> Tensor::unbind(Index axis) const {
@@ -40,6 +46,8 @@ std::vector<Tensor> Tensor::unbind(Index axis) const {
 }
 
 Tensor Tensor::repeat(Shape repeats) const {
+    if (repeats.size() < shape().size() || std::any_of(repeats.begin(), repeats.end(), [](Index n) { return n < 0; }))
+        throw std::invalid_argument("repeat expects nonnegative counts for every dimension");
     const auto leading = repeats.size() - shape().size();
     for (std::size_t axis = leading; axis < repeats.size(); ++axis) {
         repeats[axis] *= shape()[axis - leading];

@@ -34,6 +34,8 @@ TensorData permute(const TensorData& input, const Shape& axes) {
 }
 
 TensorData expand(const TensorData& input, Shape shape) {
+    if (std::any_of(shape.begin(), shape.end(), [](Index extent) { return extent < 0; }))
+        throw std::invalid_argument("expand requires nonnegative dimensions");
     auto result = input;
     auto strides = broadcast_strides(input.layout, shape);
     result.layout = {std::move(shape), std::move(strides), input.layout.offset};
@@ -43,14 +45,16 @@ TensorData expand(const TensorData& input, Shape shape) {
 TensorData slice(const TensorData& input, Index axis, Index start, Index stop, Index step) {
     auto result = input;
     result.layout.offset += start * result.layout.strides[axis];
-    result.layout.sizes[axis] = (stop - start + step - 1) / step;
+    result.layout.sizes[axis] = stop > start ? 1 + (stop - start - 1) / step : 0;
     result.layout.strides[axis] *= step;
     return result;
 }
 
 void slice_backward_into(TensorData& target, const TensorData& grad,
                          Index axis, Index start, Index step, bool accumulate) {
-    auto selected = slice(target, axis, start, start + grad.layout.sizes[axis] * step, step);
+    const auto count = grad.layout.sizes[axis];
+    const auto stop = count ? start + (count - 1) * step + 1 : start;
+    auto selected = slice(target, axis, start, stop, step);
     if (accumulate) add_into(selected, grad);
     else copy_into(selected, grad);
 }
@@ -75,6 +79,7 @@ Tensor flatten(const Tensor& input, Index first, Index last) {
     }
     first = detail::axis_index(first, input.ndim());
     last = detail::axis_index(last, input.ndim());
+    if (first > last) throw std::invalid_argument("flatten requires an ordered axis range");
     if (first == last) {
         return input;
     }
@@ -168,12 +173,17 @@ Tensor Tensor::squeeze(Index axis) const {
 }
 
 Tensor Tensor::select(Index axis, Index index) const {
-    if (index < 0) index += size(axis);
+    const auto extent = size(axis);
+    if (index < 0) index += extent;
+    if (index < 0 || index >= extent) throw std::out_of_range("select index outside dimension");
     return slice(axis, index, index + 1).squeeze(axis);
 }
 
 Tensor Tensor::narrow(Index axis, Index start, Index length) const {
-    if (start < 0) start += size(axis);
+    const auto extent = size(axis);
+    if (start < 0) start += extent;
+    if (start < 0 || start > extent || length < 0 || length > extent - start)
+        throw std::out_of_range("narrow range outside dimension");
     return slice(axis, start, start + length);
 }
 
@@ -188,9 +198,11 @@ Tensor Tensor::transpose(Index first, Index second) const {
 }
 
 Tensor Tensor::permute(Shape axes) const {
-    Shape inverse(axes.size());
+    if (axes.size() != shape().size()) throw std::invalid_argument("permute expects one axis per dimension");
+    Shape inverse(axes.size(), -1);
     for (std::size_t dim = 0; dim < axes.size(); ++dim) {
         axes[dim] = detail::axis_index(axes[dim], ndim());
+        if (inverse[axes[dim]] != -1) throw std::invalid_argument("permute axes must be distinct");
         inverse[axes[dim]] = static_cast<Index>(dim);
     }
     return detail::record(detail::numeric::permute(detail::data_of(*this), axes),
@@ -202,6 +214,8 @@ Tensor Tensor::permute(Shape axes) const {
 
 Tensor Tensor::slice(Index axis, Index start, Index stop, Index step) const {
     axis = detail::axis_index(axis, ndim());
+    if (step <= 0 || start < 0 || stop < start || stop > shape()[axis])
+        throw std::invalid_argument("slice requires a positive step and an ordered range within the dimension");
     return detail::record(detail::numeric::slice(detail::data_of(*this), axis, start, stop, step),
         {detail::gradient_edge(*this)},
         [shape = shape(), axis, start, step](const auto& grad, auto& sink, const auto& edges) {

@@ -5,6 +5,7 @@
 #include "dl/random.h"
 
 #include <algorithm>
+#include <stdexcept>
 
 namespace dl::plan::ops {
 namespace {
@@ -115,23 +116,20 @@ Operation attention(AttentionComputeOptions options, bool masked, bool keyed) {
 
 Operation matmul() {
     return {"matmul", [](std::span<const TensorSpec> inputs) {
-        const auto& a = inputs[0];
-        const auto& b = inputs[1];
-        const auto left = std::span<const Index>(a.shape), right = std::span<const Index>(b.shape);
-        const bool left_vector = left.size() == 1, right_vector = right.size() == 1;
-        auto shape = detail::broadcast_shape(left.first(left_vector ? 0 : left.size() - 2),
-            right.first(right_vector ? 0 : right.size() - 2));
-        if (!left_vector) shape.push_back(left[left.size() - 2]);
-        if (!right_vector) shape.push_back(right.back());
-        return OutputSpec{contiguous_spec(std::move(shape), accumulation_dtype(a.dtype), a.device), std::nullopt};
+        if (inputs.size() != 2) throw std::invalid_argument("matmul expects two inputs");
+        if (inputs[0].device != inputs[1].device) throw std::invalid_argument("matmul inputs must share a device");
+        auto shape = detail::matmul_shape(inputs[0].shape, inputs[1].shape);
+        return OutputSpec{contiguous_spec(std::move(shape), accumulation_dtype(inputs[0].dtype), inputs[0].device)};
     }, [](std::span<const Tensor> inputs) { return dl::matmul(inputs[0], inputs[1]); },
         Effect::none, Semantic::custom, {"matmul", {}}};
 }
 
 Operation linear() {
     return {"linear", [](std::span<const TensorSpec> inputs) {
-        auto shape = inputs[0].shape;
-        shape.back() = inputs[1].shape[0];
+        if (inputs.size() != 2 && inputs.size() != 3) throw std::invalid_argument("linear expects input, weight and optional bias");
+        if (inputs[0].device != inputs[1].device || (inputs.size() == 3 && inputs[0].device != inputs[2].device))
+            throw std::invalid_argument("linear inputs must share a device");
+        auto shape = detail::linear_shape(inputs[0].shape, inputs[1].shape, inputs.size() == 3 ? &inputs[2].shape : nullptr);
         return OutputSpec{contiguous_spec(std::move(shape), accumulation_dtype(inputs[0].dtype), inputs[0].device)};
     }, [](std::span<const Tensor> inputs) {
         const auto bias = inputs.size() == 3 ? std::optional{inputs[2]} : std::nullopt;

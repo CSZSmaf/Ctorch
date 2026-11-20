@@ -30,7 +30,7 @@ struct Scale : dl::nn::UnaryModule {
 template <class Function> void rejects(Function function) {
     bool rejected = false;
     try { function(); } catch (const std::invalid_argument&) { rejected = true; }
-    test::expect(rejected, "registration rejects ambiguous names");
+    test::expect(rejected, "expected invalid argument");
 }
 
 void update(Tied& model, dl::optim::Optimizer& optimizer) {
@@ -63,6 +63,11 @@ int main() {
         for (std::size_t i = 0; i < cached.size(); ++i) test::close(cached[i], expected_full[i]);
         for (auto& layer : cache) layer.truncate(2);
         test::expect(cache.front().length() == 2, "cache keeps an existing prefix");
+        cache.back() = dl::nn::KVCache(2);
+        cache.front().clear();
+        decoder.decode(input.narrow(1, 0, 1), cache);
+        rejects([&] { decoder.decode(input.narrow(1, 1, 2), cache); });
+        test::expect(cache[0].length() == 1 && cache[1].length() == 1, "failed chunk preserves the prefix");
         dl::nn::Linear base(3, 2, false, {.dtype = dl::DType::f64});
         dl::nn::LoRALinear adapter(base, 2, 4);
         auto adapted = adapter(test::tensor({1, 2, 3}, {1, 3}));
@@ -72,11 +77,11 @@ int main() {
         dl::data::DataLoader data({dl::arange(7), dl::arange(7)}, {.batch_size = 2, .shuffle = false}, data_random);
         dl::data::PrefetchLoader pipeline(data, dl::Device::cpu(), 2, true);
         test::values(pipeline.next()->input, {0, 1});
-        auto pending = pipeline.state_dict();
-        auto position = data.state_dict();
+        dl::optim::AdamW pipeline_optimizer(base.parameters());
+        auto saved_pipeline = dl::io::capture_checkpoint(base, pipeline_optimizer, {}, pipeline);
         auto expected = pipeline.next()->input;
-        pipeline.load_state_dict(pending);
-        data.load_state_dict(position);
+        rejects([&] { dl::io::restore_checkpoint(saved_pipeline, base, pipeline_optimizer, &data); });
+        dl::io::restore_checkpoint(saved_pipeline, base, pipeline_optimizer, pipeline);
         auto actual = pipeline.next()->input;
         test::expect(expected.to_vector<float>() == actual.to_vector<float>(), "background prefetch restore");
         dl::training::EarlyStopping stop({.patience = 2});

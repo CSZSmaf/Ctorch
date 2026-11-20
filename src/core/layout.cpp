@@ -14,7 +14,11 @@ Index numel(std::span<const Index> shape) {
     return std::accumulate(shape.begin(), shape.end(), Index{1}, std::multiplies<Index>{});
 }
 
-Index axis_index(Index axis, Index rank) { return axis < 0 ? axis + rank : axis; }
+Index axis_index(Index axis, Index rank) {
+    if (axis < 0) axis += rank;
+    if (axis < 0 || axis >= rank) throw std::out_of_range("axis outside tensor rank");
+    return axis;
+}
 
 Shape insert_axis(std::span<const Index> values, Index axis, Index value) {
     Shape result(values.size() + 1);
@@ -60,6 +64,28 @@ Shape broadcast_shape(std::span<const Index> a, std::span<const Index> b) {
     return shape;
 }
 
+Shape matmul_shape(std::span<const Index> left, std::span<const Index> right) {
+    if (left.empty() || right.empty()) throw std::invalid_argument("matmul requires vectors or matrices");
+    const bool left_vector = left.size() == 1, right_vector = right.size() == 1;
+    if (left.back() != right[right_vector ? 0 : right.size() - 2])
+        throw std::invalid_argument("matmul contracted dimensions differ");
+    auto shape = broadcast_shape(left.first(left_vector ? 0 : left.size() - 2),
+                                 right.first(right_vector ? 0 : right.size() - 2));
+    if (!left_vector) shape.push_back(left[left.size() - 2]);
+    if (!right_vector) shape.push_back(right.back());
+    return shape;
+}
+
+Shape linear_shape(const Shape& input, const Shape& weight, const Shape* bias) {
+    if (input.empty() || weight.size() != 2 || input.back() != weight[1])
+        throw std::invalid_argument("linear expects input [...,in] and weight [out,in]");
+    if (bias && (bias->size() != 1 || bias->front() != weight[0]))
+        throw std::invalid_argument("linear bias must have shape [out]");
+    auto shape = input;
+    shape.back() = weight[0];
+    return shape;
+}
+
 Shape all_axes(Index rank) {
     Shape axes(static_cast<std::size_t>(rank));
     std::iota(axes.begin(), axes.end(), Index{0});
@@ -71,6 +97,8 @@ Shape normalize_axes(Shape axes, Index rank) {
         axis = axis_index(axis, rank);
     }
     std::sort(axes.begin(), axes.end());
+    if (std::adjacent_find(axes.begin(), axes.end()) != axes.end())
+        throw std::invalid_argument("reduction axes must be distinct");
     return axes;
 }
 
@@ -149,9 +177,12 @@ std::optional<Shape> reshape_strides(const Layout& source, std::span<const Index
 }
 
 Shape broadcast_strides(const Layout& source, std::span<const Index> shape) {
+    if (shape.size() < source.sizes.size()) throw std::invalid_argument("broadcast target has too few dimensions");
     Shape strides(shape.size(), 0);
     const auto leading = shape.size() - source.sizes.size();
     for (std::size_t dim = 0; dim < source.sizes.size(); ++dim) {
+        if (source.sizes[dim] != 1 && source.sizes[dim] != shape[leading + dim])
+            throw std::invalid_argument("incompatible broadcast target");
         strides[leading + dim] = source.sizes[dim] == 1 ? 0 : source.strides[dim];
     }
     return strides;

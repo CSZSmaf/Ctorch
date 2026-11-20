@@ -7,14 +7,16 @@
 
 namespace examples {
 
-inline std::unique_ptr<dl::nn::Sequential> mnist_mlp() {
+inline std::unique_ptr<dl::nn::Sequential> two_layer_mlp(dl::Index inputs, dl::Index hidden, dl::Index classes) {
     auto model = std::make_unique<dl::nn::Sequential>();
     model->append<dl::nn::Flatten>("flatten");
-    model->append<dl::nn::Linear>("hidden", 784, 128);
+    model->append<dl::nn::Linear>("hidden", inputs, hidden);
     model->append<dl::nn::ReLU>("activation");
-    model->append<dl::nn::Linear>("output", 128, 10);
+    model->append<dl::nn::Linear>("output", hidden, classes);
     return model;
 }
+
+inline std::unique_ptr<dl::nn::Sequential> mnist_mlp() { return two_layer_mlp(784, 128, 10); }
 
 // 28×28 输入经过两次无填充卷积和池化，得到 16×4×4 个特征。
 inline std::unique_ptr<dl::nn::Sequential> lenet() {

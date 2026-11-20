@@ -126,11 +126,17 @@ void capture_runtime(TrainingCheckpoint& result, TrainingProgress progress,
     if (scaler) result.scaler = scaler->state_dict();
 }
 
-void restore_runtime(const TrainingCheckpoint& checkpoint, data::DataLoader* loader,
+struct LoaderTarget {
+    data::DataLoader* source;
+    data::PrefetchLoader* prefetch = nullptr;
+};
+
+void restore_runtime(const TrainingCheckpoint& checkpoint, LoaderTarget loader,
     std::span<const NamedGenerator> generators,
     std::span<const NamedScheduler> schedulers, GradScaler* scaler) {
     if (checkpoint.loader) {
-        loader->load_state_dict(*checkpoint.loader);
+        if (loader.prefetch) loader.prefetch->load_state_dict(*checkpoint.loader, checkpoint.prefetch);
+        else loader.source->load_state_dict(*checkpoint.loader);
     }
     for (const auto& entry : generators) {
         const auto source = std::find_if(checkpoint.generators.begin(), checkpoint.generators.end(),
@@ -146,9 +152,11 @@ void restore_runtime(const TrainingCheckpoint& checkpoint, data::DataLoader* loa
     default_generator().load_state(checkpoint.random_state);
 }
 
-void require_runtime(const TrainingCheckpoint& checkpoint, const data::DataLoader* loader,
+void require_runtime(const TrainingCheckpoint& checkpoint, LoaderTarget loader,
     std::span<const NamedGenerator> generators, std::span<const NamedScheduler> schedulers, const GradScaler* scaler) {
-    if (checkpoint.loader && !loader) throw std::invalid_argument("checkpoint restoration requires its data loader");
+    if (checkpoint.loader && !loader.source) throw std::invalid_argument("checkpoint restoration requires its data loader");
+    if (checkpoint.prefetch && !checkpoint.prefetch->pending.empty() && !loader.prefetch)
+        throw std::invalid_argument("checkpoint contains pending batches and requires a PrefetchLoader");
     if (checkpoint.scaler && !scaler) throw std::invalid_argument("checkpoint restoration requires its gradient scaler");
     auto same_names = [](const auto& saved, const auto& supplied, const char* kind) {
         std::vector<std::string_view> expected, actual;
@@ -177,8 +185,8 @@ TrainingCheckpoint capture_checkpoint(const nn::Module& model, const optim::Opti
     return result;
 }
 
-TrainingProgress restore_checkpoint(const TrainingCheckpoint& checkpoint, nn::Module& model,
-    optim::Optimizer& optimizer, data::DataLoader* loader, std::span<const NamedGenerator> generators,
+static TrainingProgress restore_module(const TrainingCheckpoint& checkpoint, nn::Module& model,
+    optim::Optimizer& optimizer, LoaderTarget loader, std::span<const NamedGenerator> generators,
     std::span<const NamedScheduler> schedulers, GradScaler* scaler) {
     require_runtime(checkpoint, loader, generators, schedulers, scaler);
     if (checkpoint.optimizer.index() != optimizer.state_dict().index())
@@ -221,8 +229,8 @@ TrainingCheckpoint capture_checkpoint(const nn::FunctionalModule& functional, co
     return result;
 }
 
-FunctionalTrainingState restore_checkpoint(const TrainingCheckpoint& checkpoint,
-    const nn::FunctionalModule& functional, Device device, data::DataLoader* loader,
+static FunctionalTrainingState restore_functional(const TrainingCheckpoint& checkpoint,
+    const nn::FunctionalModule& functional, Device device, LoaderTarget loader,
     std::span<const NamedGenerator> generators, GradScaler* scaler) {
     require_runtime(checkpoint, loader, generators, {}, scaler);
     FunctionalTrainingState result{{}, {}, checkpoint.random_key.value(), checkpoint.progress};
@@ -252,6 +260,18 @@ FunctionalTrainingState restore_checkpoint(const TrainingCheckpoint& checkpoint,
     return result;
 }
 
+TrainingProgress restore_checkpoint(const TrainingCheckpoint& checkpoint, nn::Module& model,
+    optim::Optimizer& optimizer, data::DataLoader* loader, std::span<const NamedGenerator> generators,
+    std::span<const NamedScheduler> schedulers, GradScaler* scaler) {
+    return restore_module(checkpoint, model, optimizer, {loader}, generators, schedulers, scaler);
+}
+
+FunctionalTrainingState restore_checkpoint(const TrainingCheckpoint& checkpoint,
+    const nn::FunctionalModule& functional, Device device, data::DataLoader* loader,
+    std::span<const NamedGenerator> generators, GradScaler* scaler) {
+    return restore_functional(checkpoint, functional, device, {loader}, generators, scaler);
+}
+
 TrainingCheckpoint capture_checkpoint(const nn::Module& model, const optim::Optimizer& optimizer,
     TrainingProgress progress, const data::PrefetchLoader& loader, std::span<const NamedGenerator> generators,
     std::span<const NamedScheduler> schedulers, const GradScaler* scaler) {
@@ -264,10 +284,7 @@ TrainingCheckpoint capture_checkpoint(const nn::Module& model, const optim::Opti
 TrainingProgress restore_checkpoint(const TrainingCheckpoint& checkpoint, nn::Module& model,
     optim::Optimizer& optimizer, data::PrefetchLoader& loader, std::span<const NamedGenerator> generators,
     std::span<const NamedScheduler> schedulers, GradScaler* scaler) {
-    require_runtime(checkpoint, &loader.source(), generators, schedulers, scaler);
-    loader.load_state_dict(checkpoint.prefetch.value_or(data::PrefetchState{}));
-    auto progress = restore_checkpoint(checkpoint, model, optimizer, &loader.source(), generators, schedulers, scaler);
-    return progress;
+    return restore_module(checkpoint, model, optimizer, {&loader.source(), &loader}, generators, schedulers, scaler);
 }
 
 TrainingCheckpoint capture_checkpoint(const nn::FunctionalModule& functional, const nn::FunctionalState& state,
@@ -282,10 +299,7 @@ TrainingCheckpoint capture_checkpoint(const nn::FunctionalModule& functional, co
 FunctionalTrainingState restore_checkpoint(const TrainingCheckpoint& checkpoint,
     const nn::FunctionalModule& functional, Device device, data::PrefetchLoader& loader,
     std::span<const NamedGenerator> generators, GradScaler* scaler) {
-    require_runtime(checkpoint, &loader.source(), generators, {}, scaler);
-    loader.load_state_dict(checkpoint.prefetch.value_or(data::PrefetchState{}));
-    auto result = restore_checkpoint(checkpoint, functional, device, &loader.source(), generators, scaler);
-    return result;
+    return restore_functional(checkpoint, functional, device, {&loader.source(), &loader}, generators, scaler);
 }
 
 void save_checkpoint(const std::filesystem::path& path, const TrainingCheckpoint& checkpoint) {
